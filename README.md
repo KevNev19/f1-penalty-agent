@@ -2,12 +2,15 @@
 
 An AI-powered agent that explains Formula 1 penalties and regulations to fans using RAG (Retrieval-Augmented Generation) with official FIA documents.
 
+[![CI](https://github.com/KevNev19/f1-penalty-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/KevNev19/f1-penalty-agent/actions/workflows/ci.yml)
+
 ## Features
 
 - 🔍 **Semantic Search** - Find relevant regulations and stewards' decisions
-- 🤖 **AI Explanations** - Natural language explanations of penalties
+- 🤖 **AI Explanations** - Natural language explanations of penalties using Gemini
 - 📄 **Official Sources** - Uses FIA documents and race data
 - ☸️ **Kubernetes Ready** - Runs ChromaDB in Docker Desktop Kubernetes
+- 🔄 **Retry Logic** - Exponential backoff for API rate limits
 
 ## Quick Start
 
@@ -21,7 +24,7 @@ An AI-powered agent that explains Formula 1 penalties and regulations to fans us
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/f1-penalty-agent.git
+git clone https://github.com/KevNev19/f1-penalty-agent.git
 cd f1-penalty-agent
 
 # Install dependencies
@@ -46,7 +49,7 @@ kubectl port-forward -n f1-agent svc/chromadb 8000:8000
 ### Data Setup
 
 ```bash
-# Download and index F1 documents
+# Download and index F1 documents (uses K8s ChromaDB)
 poetry run python -m src.interface.cli setup --chroma-host localhost
 ```
 
@@ -56,11 +59,21 @@ poetry run python -m src.interface.cli setup --chroma-host localhost
 # Ask a single question
 poetry run python -m src.interface.cli ask "Why did Verstappen get a penalty?" --chroma-host localhost
 
-# Interactive chat
+# Interactive chat (uses CHROMA_HOST from .env if set)
 poetry run python -m src.interface.cli chat
 
 # Check data status
 poetry run python -m src.interface.cli status
+```
+
+## Environment Variables
+
+Instead of CLI flags, you can set these in `.env`:
+
+```bash
+GOOGLE_API_KEY=your_key_here
+CHROMA_HOST=localhost  # For K8s mode
+CHROMA_PORT=8000
 ```
 
 ## Example Questions
@@ -76,22 +89,24 @@ poetry run python -m src.interface.cli status
 f1-penalty-agent/
 ├── src/
 │   ├── agent/         # AI agent logic and prompts
-│   ├── config/        # Configuration management
+│   ├── config.py      # Configuration (pydantic-settings)
 │   ├── data/          # FIA scraper, FastF1 loader
-│   ├── interface/     # CLI interface
-│   ├── llm/           # Gemini API client
+│   ├── interface/     # CLI interface (Typer)
+│   ├── llm/           # Gemini API client with retry logic
+│   ├── logging_config.py  # Structured logging
 │   └── rag/           # VectorStore, Retriever
 ├── infra/
 │   ├── k8s/           # Kubernetes manifests
 │   └── terraform/     # GCP resources (optional)
-├── scripts/           # Setup scripts
-└── tests/             # Test suite
+├── scripts/           # Cross-platform setup script
+├── tests/             # 30+ unit tests, integration tests
+└── .github/workflows/ # CI pipeline
 ```
 
 ## Development
 
 ```bash
-# Run unit tests
+# Run unit tests (30 tests)
 poetry run pytest tests/ -m unit -v
 
 # Run integration tests (requires ChromaDB)
