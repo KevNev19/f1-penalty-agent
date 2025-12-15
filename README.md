@@ -99,14 +99,14 @@ f1-penalty-agent/
 │   ├── k8s/           # Kubernetes manifests
 │   └── terraform/     # GCP resources (optional)
 ├── scripts/           # Cross-platform setup script
-├── tests/             # 30+ unit tests, integration tests
+├── tests/             # 43 unit tests, integration tests
 └── .github/workflows/ # CI pipeline
 ```
 
 ## Development
 
 ```bash
-# Run unit tests (30 tests)
+# Run unit tests (43 tests)
 poetry run pytest tests/ -m unit -v
 
 # Run integration tests (requires ChromaDB)

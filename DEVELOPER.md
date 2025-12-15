@@ -65,7 +65,7 @@ cp .env.example .env
 ### Run Tests
 
 ```bash
-# Unit tests only (30 tests, no external deps)
+# Unit tests only (43 tests, no external deps)
 poetry run pytest tests/ -m unit -v
 
 # Integration tests (requires ChromaDB + API key)
@@ -144,7 +144,8 @@ poetry run pytest tests/test_suite.py::TestQueryClassification -v
 | Prompts | 3 | Existence, placeholders, enums |
 | VectorStore | 1 | Initialization |
 | GeminiClient | 2 | Init, API key validation |
-| **Total Unit** | **30** | |
+| Infrastructure | 13 | OS detection, K8s manifest validation |
+| **Total Unit** | **43** | |
 
 ## Troubleshooting
 
