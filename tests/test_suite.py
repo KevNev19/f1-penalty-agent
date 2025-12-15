@@ -192,15 +192,15 @@ class TestF1Agent:
     def test_query_type_enum(self):
         """QueryType enum should exist."""
         from src.agent.f1_agent import QueryType
-        assert hasattr(QueryType, 'PENALTY')
-        assert hasattr(QueryType, 'RULE')
+        assert hasattr(QueryType, 'PENALTY_EXPLANATION')
+        assert hasattr(QueryType, 'RULE_LOOKUP')
         assert hasattr(QueryType, 'GENERAL')
     
     @pytest.mark.unit
     def test_prompts_exist(self):
         """Prompt templates should be defined."""
-        from src.agent.prompts import SYSTEM_PROMPT, PENALTY_EXPLANATION_PROMPT
-        assert len(SYSTEM_PROMPT) > 100
+        from src.agent.prompts import F1_SYSTEM_PROMPT, PENALTY_EXPLANATION_PROMPT
+        assert len(F1_SYSTEM_PROMPT) > 100
         assert PENALTY_EXPLANATION_PROMPT is not None
     
     @pytest.mark.integration
