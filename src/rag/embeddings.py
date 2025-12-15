@@ -1,6 +1,5 @@
 """Embedding model for converting text to vectors."""
 
-
 from rich.console import Console
 
 console = Console()
@@ -24,6 +23,7 @@ class EmbeddingModel:
         if self._model is None:
             console.print(f"[blue]Loading embedding model: {self.model_name}...[/]")
             from sentence_transformers import SentenceTransformer
+
             self._model = SentenceTransformer(self.model_name)
             console.print("[green]Embedding model loaded[/]")
 

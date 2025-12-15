@@ -59,6 +59,7 @@ class GeminiClient:
             Generated text response.
         """
         import time
+
         model = self._get_model()
 
         # Combine system and user prompts
@@ -87,7 +88,7 @@ class GeminiClient:
                 error_msg = str(e).lower()
                 if "quota" in error_msg or "rate" in error_msg:
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt  # Exponential backoff
+                        wait_time = 2**attempt  # Exponential backoff
                         console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
                         time.sleep(wait_time)
                     else:
@@ -98,7 +99,7 @@ class GeminiClient:
                 else:
                     console.print(f"[red]Gemini error: {e}[/]")
                     raise
-        
+
         return "Failed to generate response after retries."
 
     def generate_stream(

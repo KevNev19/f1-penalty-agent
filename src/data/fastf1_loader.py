@@ -54,6 +54,7 @@ class FastF1Loader:
         """Set up FastF1 with caching."""
         try:
             import fastf1
+
             fastf1.Cache.enable_cache(str(self.cache_dir))
             self._fastf1_enabled = True
             console.print("[green]FastF1 cache enabled[/]")
@@ -94,7 +95,10 @@ class FastF1Loader:
             session.load(messages=True)
 
             # Get race control messages
-            if hasattr(session, "race_control_messages") and session.race_control_messages is not None:
+            if (
+                hasattr(session, "race_control_messages")
+                and session.race_control_messages is not None
+            ):
                 rcm = session.race_control_messages
 
                 for _, msg in rcm.iterrows():
@@ -122,21 +126,24 @@ class FastF1Loader:
                     # Try to extract driver number/name
                     # Messages often contain car numbers like "CAR 1" or driver codes
                     import re
+
                     car_match = re.search(r"CAR\s*(\d+)", message, re.I)
                     if car_match:
                         driver = f"Car {car_match.group(1)}"
 
                     # Only include penalty-related messages
                     if category != "General":
-                        events.append(PenaltyEvent(
-                            message=message,
-                            driver=driver,
-                            time=time if isinstance(time, datetime) else None,
-                            category=category,
-                            session=session_type,
-                            race_name=race_name,
-                            season=season,
-                        ))
+                        events.append(
+                            PenaltyEvent(
+                                message=message,
+                                driver=driver,
+                                time=time if isinstance(time, datetime) else None,
+                                category=category,
+                                session=session_type,
+                                race_name=race_name,
+                                season=season,
+                            )
+                        )
 
             console.print(f"  Found {len(events)} penalty-related messages")
 
@@ -168,15 +175,17 @@ class FastF1Loader:
 
             if hasattr(session, "results") and session.results is not None:
                 for _, row in session.results.iterrows():
-                    results.append(RaceResult(
-                        position=int(row.get("Position", 0)),
-                        driver=row.get("FullName", row.get("Abbreviation", "Unknown")),
-                        team=row.get("TeamName", "Unknown"),
-                        time_or_status=str(row.get("Time", row.get("Status", ""))),
-                        points=float(row.get("Points", 0)),
-                        race_name=race_name,
-                        season=season,
-                    ))
+                    results.append(
+                        RaceResult(
+                            position=int(row.get("Position", 0)),
+                            driver=row.get("FullName", row.get("Abbreviation", "Unknown")),
+                            team=row.get("TeamName", "Unknown"),
+                            time_or_status=str(row.get("Time", row.get("Status", ""))),
+                            points=float(row.get("Points", 0)),
+                            race_name=race_name,
+                            season=season,
+                        )
+                    )
 
         except Exception as e:
             console.print(f"[red]Error loading results: {e}[/]")

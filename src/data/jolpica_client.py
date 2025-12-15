@@ -40,9 +40,7 @@ class JolpicaClient:
     def __init__(self) -> None:
         """Initialize the client."""
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "F1-Penalty-Agent/1.0"
-        })
+        self.session.headers.update({"User-Agent": "F1-Penalty-Agent/1.0"})
 
     def _get(self, endpoint: str) -> dict | None:
         """Make a GET request to the API.
@@ -79,13 +77,15 @@ class JolpicaClient:
         try:
             driver_list = data["MRData"]["DriverTable"]["Drivers"]
             for d in driver_list:
-                drivers.append(Driver(
-                    driver_id=d.get("driverId", ""),
-                    code=d.get("code", ""),
-                    name=f"{d.get('givenName', '')} {d.get('familyName', '')}".strip(),
-                    nationality=d.get("nationality", ""),
-                    number=int(d.get("permanentNumber")) if d.get("permanentNumber") else None,
-                ))
+                drivers.append(
+                    Driver(
+                        driver_id=d.get("driverId", ""),
+                        code=d.get("code", ""),
+                        name=f"{d.get('givenName', '')} {d.get('familyName', '')}".strip(),
+                        nationality=d.get("nationality", ""),
+                        number=int(d.get("permanentNumber")) if d.get("permanentNumber") else None,
+                    )
+                )
         except (KeyError, TypeError) as e:
             console.print(f"[yellow]Parse warning: {e}[/]")
 
@@ -110,14 +110,16 @@ class JolpicaClient:
             for r in race_list:
                 circuit = r.get("Circuit", {})
                 location = circuit.get("Location", {})
-                races.append(Race(
-                    round_num=int(r.get("round", 0)),
-                    name=r.get("raceName", ""),
-                    circuit=circuit.get("circuitName", ""),
-                    country=location.get("country", ""),
-                    date=r.get("date", ""),
-                    season=season,
-                ))
+                races.append(
+                    Race(
+                        round_num=int(r.get("round", 0)),
+                        name=r.get("raceName", ""),
+                        circuit=circuit.get("circuitName", ""),
+                        country=location.get("country", ""),
+                        date=r.get("date", ""),
+                        season=season,
+                    )
+                )
         except (KeyError, TypeError) as e:
             console.print(f"[yellow]Parse warning: {e}[/]")
 

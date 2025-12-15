@@ -1,6 +1,5 @@
 """CLI interface for the F1 Penalty Agent."""
 
-
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
@@ -84,11 +83,13 @@ def chat():
 
             # Display the response
             console.print()
-            console.print(Panel(
-                Markdown(response.answer),
-                title="[bold red]F1 Agent[/]",
-                border_style="red",
-            ))
+            console.print(
+                Panel(
+                    Markdown(response.answer),
+                    title="[bold red]F1 Agent[/]",
+                    border_style="red",
+                )
+            )
 
             # Show sources if available
             if response.sources_used:
@@ -128,13 +129,12 @@ def ask(
 @app.command()
 def setup(
     chroma_host: str | None = typer.Option(
-        None, "--chroma-host", "-h",
-        help="ChromaDB server host (for K8s mode). Default: use local PersistentClient."
+        None,
+        "--chroma-host",
+        "-h",
+        help="ChromaDB server host (for K8s mode). Default: use local PersistentClient.",
     ),
-    chroma_port: int = typer.Option(
-        8000, "--chroma-port", "-p",
-        help="ChromaDB server port."
-    ),
+    chroma_port: int = typer.Option(8000, "--chroma-port", "-p", help="ChromaDB server port."),
 ):
     """Download and index F1 regulations and data."""
     from ..config import settings

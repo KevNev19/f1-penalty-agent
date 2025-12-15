@@ -183,12 +183,12 @@ class F1Retriever:
 Race: {event.race_name} {event.season}
 Session: {event.session}
 Category: {event.category}
-Driver: {event.driver or 'Unknown'}
-Time: {event.time or 'Unknown'}
+Driver: {event.driver or "Unknown"}
+Time: {event.time or "Unknown"}
 
 Message: {event.message}
 
-{event.details or ''}
+{event.details or ""}
         """.strip()
 
         doc = Document(
@@ -200,7 +200,9 @@ Message: {event.message}
                 "category": event.category,
                 "driver": event.driver or "",
             },
-            doc_id=f"penalty_{event.race_name}_{event.season}_{event.message[:30]}".replace(" ", "_"),
+            doc_id=f"penalty_{event.race_name}_{event.season}_{event.message[:30]}".replace(
+                " ", "_"
+            ),
         )
 
         return self.vector_store.add_documents([doc], VectorStore.RACE_DATA_COLLECTION)
@@ -230,19 +232,13 @@ Message: {event.message}
         race_data = []
 
         if include_regulations:
-            regulations = self.vector_store.search(
-                query, VectorStore.REGULATIONS_COLLECTION, top_k
-            )
+            regulations = self.vector_store.search(query, VectorStore.REGULATIONS_COLLECTION, top_k)
 
         if include_stewards:
-            stewards = self.vector_store.search(
-                query, VectorStore.STEWARDS_COLLECTION, top_k
-            )
+            stewards = self.vector_store.search(query, VectorStore.STEWARDS_COLLECTION, top_k)
 
         if include_race_data:
-            race_data = self.vector_store.search(
-                query, VectorStore.RACE_DATA_COLLECTION, top_k
-            )
+            race_data = self.vector_store.search(query, VectorStore.RACE_DATA_COLLECTION, top_k)
 
         return RetrievalContext(
             regulations=regulations,
@@ -290,11 +286,33 @@ Message: {event.message}
 
         # Race names
         race_patterns = [
-            "Bahrain", "Saudi Arabian", "Australian", "Japanese", "Chinese",
-            "Miami", "Monaco", "Spanish", "Canadian", "Austrian", "British",
-            "Hungarian", "Belgian", "Dutch", "Italian", "Azerbaijan", "Singapore",
-            "United States", "Mexican", "Brazilian", "Las Vegas", "Qatar", "Abu Dhabi",
-            "Silverstone", "Monza", "Spa", "Imola",
+            "Bahrain",
+            "Saudi Arabian",
+            "Australian",
+            "Japanese",
+            "Chinese",
+            "Miami",
+            "Monaco",
+            "Spanish",
+            "Canadian",
+            "Austrian",
+            "British",
+            "Hungarian",
+            "Belgian",
+            "Dutch",
+            "Italian",
+            "Azerbaijan",
+            "Singapore",
+            "United States",
+            "Mexican",
+            "Brazilian",
+            "Las Vegas",
+            "Qatar",
+            "Abu Dhabi",
+            "Silverstone",
+            "Monza",
+            "Spa",
+            "Imola",
         ]
 
         for race in race_patterns:

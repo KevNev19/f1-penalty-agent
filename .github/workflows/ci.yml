@@ -32,7 +32,9 @@ jobs:
       
       - name: Run ruff linter
         run: poetry run ruff check src/ tests/
-        continue-on-error: true
+      
+      - name: Check ruff formatting
+        run: poetry run ruff format src/ tests/ --check
 
   test-unit:
     name: Unit Tests

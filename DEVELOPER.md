@@ -78,6 +78,24 @@ poetry run pytest tests/ -v --cov=src
 poetry run pytest tests/test_suite.py::TestQueryClassification -v
 ```
 
+### Linting
+
+```bash
+# Check for linting errors
+poetry run ruff check src/ tests/
+
+# Auto-fix linting errors
+poetry run ruff check src/ tests/ --fix
+
+# Check code formatting
+poetry run ruff format src/ tests/ --check
+
+# Auto-format code
+poetry run ruff format src/ tests/
+```
+
+**Note:** Linting is enforced in CI. PRs will fail if there are linting errors.
+
 ## CLI Commands
 
 | Command | Description |

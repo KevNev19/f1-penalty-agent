@@ -1,6 +1,7 @@
 """
 Pytest configuration and shared fixtures.
 """
+
 import os
 import shutil
 import tempfile
@@ -11,6 +12,7 @@ import pytest
 # ============================================================================
 # Test Configuration
 # ============================================================================
+
 
 def pytest_configure(config):
     """Configure pytest markers."""
@@ -23,6 +25,7 @@ def pytest_configure(config):
 # Fixtures - Configuration
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def api_key():
     """Get Google API key from environment."""
@@ -33,12 +36,12 @@ def api_key():
         if env_file.exists():
             for line in env_file.read_text().splitlines():
                 if line.startswith("GOOGLE_API_KEY="):
-                    key = line.split("=", 1)[1].strip().strip('"\'')
+                    key = line.split("=", 1)[1].strip().strip("\"'")
                     break
-    
+
     if not key:
         pytest.skip("GOOGLE_API_KEY not set")
-    
+
     return key
 
 
@@ -46,12 +49,14 @@ def api_key():
 def settings():
     """Get application settings."""
     from src.config import Settings
+
     return Settings()
 
 
 # ============================================================================
 # Fixtures - Temporary Directories
 # ============================================================================
+
 
 @pytest.fixture
 def temp_dir():
@@ -75,19 +80,20 @@ def test_data_dir():
 # Fixtures - Sample Data
 # ============================================================================
 
+
 @pytest.fixture
 def sample_document():
     """Sample FIA document for testing."""
     return {
         "title": "Test Stewards Decision",
         "content": "The stewards investigated an incident involving Car 1 and Car 44. "
-                   "Car 1 was found to have exceeded track limits at Turn 4, resulting "
-                   "in a 5-second time penalty added to the race time.",
+        "Car 1 was found to have exceeded track limits at Turn 4, resulting "
+        "in a 5-second time penalty added to the race time.",
         "metadata": {
             "race": "Abu Dhabi Grand Prix",
             "season": 2025,
             "doc_type": "stewards_decision",
-        }
+        },
     }
 
 
@@ -99,30 +105,31 @@ def sample_documents(sample_document):
         {
             "title": "Track Limits Regulation",
             "content": "Drivers must use the track at all times. For the avoidance of "
-                       "doubt, the white lines defining the track edges are considered "
-                       "to be part of the track but the kerbs are not.",
+            "doubt, the white lines defining the track edges are considered "
+            "to be part of the track but the kerbs are not.",
             "metadata": {
                 "doc_type": "regulation",
                 "source": "FIA Sporting Regulations",
-            }
+            },
         },
         {
             "title": "Unsafe Release Penalty",
             "content": "Team XYZ was fined €5,000 for an unsafe release of Car 7 "
-                       "during the pit stop. The car was released into the path of "
-                       "another competitor.",
+            "during the pit stop. The car was released into the path of "
+            "another competitor.",
             "metadata": {
                 "race": "Monaco Grand Prix",
                 "season": 2025,
                 "doc_type": "stewards_decision",
-            }
-        }
+            },
+        },
     ]
 
 
 # ============================================================================
 # Fixtures - Mocks
 # ============================================================================
+
 
 @pytest.fixture
 def mock_embedding():
@@ -133,7 +140,4 @@ def mock_embedding():
 @pytest.fixture
 def mock_embeddings():
     """Multiple mock embeddings for batch testing."""
-    return [
-        [0.01 * (i + j) for i in range(768)]
-        for j in range(3)
-    ]
+    return [[0.01 * (i + j) for i in range(768)] for j in range(3)]

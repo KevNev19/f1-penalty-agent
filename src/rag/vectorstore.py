@@ -28,53 +28,55 @@ class SearchResult:
 
 class GeminiEmbeddingFunction:
     """Embedding function using Google Gemini API."""
-    
+
     def __init__(self, api_key: str):
         """Initialize with API key."""
         self.api_key = api_key
         self._model = None
-    
+
     def name(self) -> str:
         """Return the embedding function name (required by ChromaDB)."""
         return "gemini-text-embedding-004"
-    
+
     def _get_model(self):
         """Lazy load the embedding model."""
         if self._model is None:
             import google.generativeai as genai
+
             genai.configure(api_key=self.api_key)
             self._model = genai
         return self._model
-    
+
     def __call__(self, input: list[str]) -> list[list[float]]:
         """Generate embeddings for the input texts (for documents).
-        
+
         This is called by ChromaDB to generate embeddings for indexing.
         """
         return self._embed_texts(input, task_type="retrieval_document")
-    
+
     def embed_query(self, input: str) -> list[float]:
         """Generate embedding for a single query text.
-        
+
         This is called by ChromaDB when performing searches.
         Args:
             input: The query text to embed.
         """
         embeddings = self._embed_texts([input], task_type="retrieval_query")
         return embeddings[0] if embeddings else [0.0] * 768
-    
+
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
         """Generate embeddings for texts with specified task type."""
         import time
+
         model = self._get_model()
         embeddings = []
-        
+
         # Process in batches to avoid rate limits
         batch_size = 10
         max_retries = 3
-        
+
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             for text in batch:
                 for attempt in range(max_retries):
                     try:
@@ -88,21 +90,23 @@ class GeminiEmbeddingFunction:
                     except Exception as e:
                         error_msg = str(e).lower()
                         if "rate" in error_msg or "quota" in error_msg:
-                            wait_time = 2 ** attempt  # Exponential backoff: 1, 2, 4 seconds
+                            wait_time = 2**attempt  # Exponential backoff: 1, 2, 4 seconds
                             console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
                             time.sleep(wait_time)
                         elif attempt == max_retries - 1:
-                            console.print(f"[red]Embedding error after {max_retries} attempts: {e}[/]")
+                            console.print(
+                                f"[red]Embedding error after {max_retries} attempts: {e}[/]"
+                            )
                             embeddings.append([0.0] * 768)  # Fallback zero vector
                         else:
                             time.sleep(0.5)  # Brief pause before retry
-        
+
         return embeddings
 
 
 class VectorStore:
     """ChromaDB-based vector store for F1 documents.
-    
+
     Uses Gemini API for embeddings to avoid Windows DLL issues with PyTorch/ONNX.
     """
 
@@ -112,8 +116,8 @@ class VectorStore:
     RACE_DATA_COLLECTION = "race_data"
 
     def __init__(
-        self, 
-        persist_dir: Path, 
+        self,
+        persist_dir: Path,
         api_key: str | None = None,
         chroma_host: str | None = None,
         chroma_port: int = 8000,
@@ -137,7 +141,7 @@ class VectorStore:
 
     def _get_client(self) -> Any:
         """Get or create ChromaDB client.
-        
+
         Uses HttpClient if chroma_host is set (k3d/Docker mode),
         otherwise uses PersistentClient (local mode with SegmentAPI workaround).
         """
@@ -151,7 +155,9 @@ class VectorStore:
                     host=self.chroma_host,
                     port=self.chroma_port,
                 )
-                console.print(f"[green]ChromaDB connected to {self.chroma_host}:{self.chroma_port}[/]")
+                console.print(
+                    f"[green]ChromaDB connected to {self.chroma_host}:{self.chroma_port}[/]"
+                )
             else:
                 # Use PersistentClient for local development
                 # IMPORTANT: Use SegmentAPI to avoid Rust bindings hanging on Windows/Python 3.12
@@ -176,13 +182,14 @@ class VectorStore:
             else:
                 # Try to get from environment
                 from ..config import settings
+
                 if settings.google_api_key:
                     self._embedding_function = GeminiEmbeddingFunction(settings.google_api_key)
                     console.print("[green]Using Gemini API for embeddings[/]")
                 else:
                     console.print("[red]No API key available for embeddings[/]")
                     return None
-        
+
         return self._embedding_function
 
     def _get_collection(self, name: str) -> Any:
@@ -196,7 +203,7 @@ class VectorStore:
         """
         if name not in self._collections:
             client = self._get_client()
-            
+
             # For HttpClient, we don't pass embedding_function (generate embeddings client-side)
             # For PersistentClient, we can use the embedding function
             if self.chroma_host:
@@ -237,13 +244,10 @@ class VectorStore:
         # Prepare data for insertion
         contents = [doc.content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
-        ids = [
-            doc.doc_id or f"{collection_name}_{i}"
-            for i, doc in enumerate(documents)
-        ]
+        ids = [doc.doc_id or f"{collection_name}_{i}" for i, doc in enumerate(documents)]
 
         console.print(f"[blue]Indexing {len(documents)} documents...[/]")
-        
+
         # For HttpClient, generate embeddings client-side
         if self.chroma_host:
             ef = self._get_embedding_function()
@@ -313,14 +317,16 @@ class VectorStore:
                 distance = results["distances"][0][i] if results["distances"] else 0
                 score = 1 - distance  # Cosine distance to similarity
 
-                search_results.append(SearchResult(
-                    document=Document(
-                        content=doc_content,
-                        metadata=metadata,
-                        doc_id=results["ids"][0][i] if results["ids"] else None,
-                    ),
-                    score=score,
-                ))
+                search_results.append(
+                    SearchResult(
+                        document=Document(
+                            content=doc_content,
+                            metadata=metadata,
+                            doc_id=results["ids"][0][i] if results["ids"] else None,
+                        ),
+                        score=score,
+                    )
+                )
 
         return search_results
 

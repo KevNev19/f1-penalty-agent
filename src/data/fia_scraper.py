@@ -33,7 +33,9 @@ class FIAScraper:
     # Base URLs for FIA documents
     FIA_BASE_URL = "https://www.fia.com"
     REGULATIONS_URL = "https://www.fia.com/regulation/category/110"  # F1 regulations page
-    DECISIONS_BASE_URL = "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14"
+    DECISIONS_BASE_URL = (
+        "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14"
+    )
 
     def __init__(self, data_dir: Path) -> None:
         """Initialize the scraper with data directory.
@@ -45,9 +47,9 @@ class FIAScraper:
         self.regulations_dir = data_dir / "regulations"
         self.stewards_dir = data_dir / "stewards"
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
+        self.session.headers.update(
+            {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        )
 
         # Ensure directories exist
         self.regulations_dir.mkdir(parents=True, exist_ok=True)
@@ -79,8 +81,10 @@ class FIAScraper:
 
                 # Filter for F1 sporting regulations
                 if str(season) in href or str(season) in title:
-                    if any(kw in title.lower() or kw in href.lower() 
-                           for kw in ["sporting", "regulation", "f1", "formula"]):
+                    if any(
+                        kw in title.lower() or kw in href.lower()
+                        for kw in ["sporting", "regulation", "f1", "formula"]
+                    ):
                         full_url = urljoin(self.FIA_BASE_URL, href)
                         doc = FIADocument(
                             title=title,
@@ -125,19 +129,25 @@ class FIAScraper:
             for link in all_links:
                 href = link.get("href", "")
                 title = link.get_text(strip=True) or href.split("/")[-1]
-                
+
                 # Only include decision documents for the target season
                 if str(season) not in href.lower() and str(season) not in title.lower():
                     continue
-                
+
                 # Filter for relevant document types
                 relevant_keywords = [
-                    "infringement", "decision", "offence", "penalty", 
-                    "collision", "unsafe", "track", "speeding"
+                    "infringement",
+                    "decision",
+                    "offence",
+                    "penalty",
+                    "collision",
+                    "unsafe",
+                    "track",
+                    "speeding",
                 ]
                 href_lower = href.lower()
                 title_lower = title.lower()
-                
+
                 if not any(kw in href_lower or kw in title_lower for kw in relevant_keywords):
                     continue
 
@@ -146,11 +156,30 @@ class FIAScraper:
                 # Extract event name from URL or title
                 event_name = None
                 races = [
-                    "bahrain", "saudi", "australia", "japan", "china",
-                    "miami", "monaco", "spain", "canada", "austria",
-                    "britain", "hungary", "belgium", "netherlands", "italy",
-                    "azerbaijan", "singapore", "usa", "mexico", "brazil",
-                    "vegas", "qatar", "abu_dhabi", "abu dhabi"
+                    "bahrain",
+                    "saudi",
+                    "australia",
+                    "japan",
+                    "china",
+                    "miami",
+                    "monaco",
+                    "spain",
+                    "canada",
+                    "austria",
+                    "britain",
+                    "hungary",
+                    "belgium",
+                    "netherlands",
+                    "italy",
+                    "azerbaijan",
+                    "singapore",
+                    "usa",
+                    "mexico",
+                    "brazil",
+                    "vegas",
+                    "qatar",
+                    "abu_dhabi",
+                    "abu dhabi",
                 ]
                 for race in races:
                     if race in href_lower or race.replace("_", " ") in title_lower:
