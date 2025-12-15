@@ -1,0 +1,66 @@
+[project]
+name = "f1-penalty-agent"
+version = "0.1.0"
+description = "AI agent for explaining F1 penalties and FIA regulations to F1 viewers"
+authors = [
+    {name = "addis"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    # Data collection
+    "fastf1>=3.4.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "pypdf>=4.0.0",
+    "lxml>=5.0.0",
+    
+    # RAG pipeline
+    "sentence-transformers>=3.0.0",
+    "chromadb>=0.5.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    
+    # LLM
+    "google-generativeai>=0.8.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+    
+    # Optional web UI
+    "gradio>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+
+[project.scripts]
+f1agent = "src.interface.cli:app"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [{include = "src"}]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

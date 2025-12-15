@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: f1-agent
+  labels:
+    app.kubernetes.io/name: f1-penalty-agent
+    app.kubernetes.io/component: infrastructure

@@ -1,0 +1,106 @@
+# F1 Penalty Agent 🏎️
+
+An AI-powered agent that explains Formula 1 penalties and regulations to fans using RAG (Retrieval-Augmented Generation) with official FIA documents.
+
+## Features
+
+- 🔍 **Semantic Search** - Find relevant regulations and stewards' decisions
+- 🤖 **AI Explanations** - Natural language explanations of penalties
+- 📄 **Official Sources** - Uses FIA documents and race data
+- ☸️ **Kubernetes Ready** - Runs ChromaDB in Docker Desktop Kubernetes
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.12+
+- Docker Desktop with Kubernetes enabled
+- Google AI API key ([get one free](https://aistudio.google.com/))
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/YOUR_USERNAME/f1-penalty-agent.git
+cd f1-penalty-agent
+
+# Install dependencies
+pip install poetry
+poetry install
+
+# Configure API key
+cp .env.example .env
+# Edit .env and add your GOOGLE_API_KEY
+```
+
+### Infrastructure Setup
+
+```bash
+# Deploy ChromaDB to Kubernetes
+python scripts/setup_infra.py
+
+# In a separate terminal, port-forward ChromaDB
+kubectl port-forward -n f1-agent svc/chromadb 8000:8000
+```
+
+### Data Setup
+
+```bash
+# Download and index F1 documents
+poetry run python -m src.interface.cli setup --chroma-host localhost
+```
+
+### Usage
+
+```bash
+# Ask a single question
+poetry run python -m src.interface.cli ask "Why did Verstappen get a penalty?" --chroma-host localhost
+
+# Interactive chat
+poetry run python -m src.interface.cli chat
+
+# Check data status
+poetry run python -m src.interface.cli status
+```
+
+## Example Questions
+
+- "Why did Hamilton get a 5-second penalty in Monaco?"
+- "What is the rule for track limits?"
+- "Explain the unsafe release penalty"
+- "What happens if a driver exceeds 107%?"
+
+## Project Structure
+
+```
+f1-penalty-agent/
+├── src/
+│   ├── agent/         # AI agent logic and prompts
+│   ├── config/        # Configuration management
+│   ├── data/          # FIA scraper, FastF1 loader
+│   ├── interface/     # CLI interface
+│   ├── llm/           # Gemini API client
+│   └── rag/           # VectorStore, Retriever
+├── infra/
+│   ├── k8s/           # Kubernetes manifests
+│   └── terraform/     # GCP resources (optional)
+├── scripts/           # Setup scripts
+└── tests/             # Test suite
+```
+
+## Development
+
+```bash
+# Run unit tests
+poetry run pytest tests/ -m unit -v
+
+# Run integration tests (requires ChromaDB)
+poetry run pytest tests/ -m integration -v
+
+# Run all tests
+poetry run pytest tests/ -v
+```
+
+## License
+
+MIT
