@@ -34,7 +34,13 @@ def get_agent():
         )
         raise typer.Exit(1)
 
-    vector_store = VectorStore(settings.chroma_persist_dir, settings.google_api_key)
+    # Use ChromaDB settings from config (supports K8s mode via CHROMA_HOST env var)
+    vector_store = VectorStore(
+        settings.chroma_persist_dir,
+        settings.google_api_key,
+        chroma_host=settings.chroma_host,
+        chroma_port=settings.chroma_port,
+    )
     retriever = F1Retriever(vector_store)
     llm = GeminiClient(settings.google_api_key, settings.llm_model)
 

@@ -65,25 +65,37 @@ class GeminiEmbeddingFunction:
     
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
         """Generate embeddings for texts with specified task type."""
+        import time
         model = self._get_model()
         embeddings = []
         
         # Process in batches to avoid rate limits
         batch_size = 10
+        max_retries = 3
+        
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             for text in batch:
-                try:
-                    result = model.embed_content(
-                        model="models/text-embedding-004",
-                        content=text,
-                        task_type=task_type,
-                    )
-                    embeddings.append(result["embedding"])
-                except Exception as e:
-                    console.print(f"[yellow]Embedding error: {e}[/]")
-                    # Return a zero vector as fallback
-                    embeddings.append([0.0] * 768)
+                for attempt in range(max_retries):
+                    try:
+                        result = model.embed_content(
+                            model="models/text-embedding-004",
+                            content=text,
+                            task_type=task_type,
+                        )
+                        embeddings.append(result["embedding"])
+                        break  # Success, move to next text
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        if "rate" in error_msg or "quota" in error_msg:
+                            wait_time = 2 ** attempt  # Exponential backoff: 1, 2, 4 seconds
+                            console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
+                            time.sleep(wait_time)
+                        elif attempt == max_retries - 1:
+                            console.print(f"[red]Embedding error after {max_retries} attempts: {e}[/]")
+                            embeddings.append([0.0] * 768)  # Fallback zero vector
+                        else:
+                            time.sleep(0.5)  # Brief pause before retry
         
         return embeddings
 

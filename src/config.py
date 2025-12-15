@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     # ChromaDB settings
     chroma_persist_dir: Path = Path("./data/chroma")
+    chroma_host: Optional[str] = None  # Set to "localhost" for K8s mode
+    chroma_port: int = 8000
 
     # Model settings
     embedding_model: str = "all-MiniLM-L6-v2"

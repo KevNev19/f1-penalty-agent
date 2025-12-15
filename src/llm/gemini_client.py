@@ -44,6 +44,7 @@ class GeminiClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        max_retries: int = 3,
     ) -> str:
         """Generate a response from the LLM.
 
@@ -52,10 +53,12 @@ class GeminiClient:
             system_prompt: Optional system instructions.
             temperature: Sampling temperature (0.0-1.0).
             max_tokens: Maximum tokens to generate.
+            max_retries: Maximum retry attempts for rate limits.
 
         Returns:
             Generated text response.
         """
+        import time
         model = self._get_model()
 
         # Combine system and user prompts
@@ -64,30 +67,39 @@ class GeminiClient:
         else:
             full_prompt = prompt
 
-        try:
-            response = model.generate_content(
-                full_prompt,
-                generation_config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_tokens,
-                },
-            )
-
-            # Handle safety filters
-            if response.prompt_feedback.block_reason:
-                return "I apologize, but I cannot provide a response to that query."
-
-            return response.text
-
-        except Exception as e:
-            error_msg = str(e)
-            if "quota" in error_msg.lower() or "rate" in error_msg.lower():
-                return (
-                    "Rate limit reached on the free tier. Please wait a moment and try again.\n"
-                    "Tip: The free tier allows ~20 requests per day."
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(
+                    full_prompt,
+                    generation_config={
+                        "temperature": temperature,
+                        "max_output_tokens": max_tokens,
+                    },
                 )
-            console.print(f"[red]Gemini error: {e}[/]")
-            raise
+
+                # Handle safety filters
+                if response.prompt_feedback.block_reason:
+                    return "I apologize, but I cannot provide a response to that query."
+
+                return response.text
+
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "quota" in error_msg or "rate" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff
+                        console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
+                        time.sleep(wait_time)
+                    else:
+                        return (
+                            "Rate limit reached. Please wait a moment and try again.\n"
+                            "Tip: The free tier has limited requests per minute."
+                        )
+                else:
+                    console.print(f"[red]Gemini error: {e}[/]")
+                    raise
+        
+        return "Failed to generate response after retries."
 
     def generate_stream(
         self,
