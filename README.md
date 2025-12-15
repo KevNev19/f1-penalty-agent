@@ -22,11 +22,29 @@ An AI-powered agent that explains Formula 1 penalties and regulations to fans us
 
 ### Installation
 
+**Automated Setup (Recommended)**
+
 ```bash
 # Clone repository
 git clone https://github.com/KevNev19/f1-penalty-agent.git
 cd f1-penalty-agent
 
+# Mac/Linux
+chmod +x scripts/setup.sh && ./scripts/setup.sh
+
+# Windows (PowerShell)
+.\scripts\setup.ps1
+```
+
+The setup script will:
+- ✓ Check all prerequisites (Python 3.12+, Poetry, Docker, kubectl)
+- ✓ Show what's missing with install commands
+- ✓ Create `.env` from template
+- ✓ Install Python dependencies
+
+**Manual Setup**
+
+```bash
 # Install dependencies
 pip install poetry
 poetry install
