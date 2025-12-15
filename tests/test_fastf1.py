@@ -5,7 +5,6 @@ Run with: pytest tests/test_fastf1.py -v
 """
 
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -99,7 +98,7 @@ class TestFastF1Loader:
         """Loader should create cache directory if it doesn't exist."""
         cache_dir = tmp_path / "new_cache"
         with patch("src.data.fastf1_loader.FastF1Loader._setup_fastf1"):
-            loader = FastF1Loader(cache_dir)
+            _loader = FastF1Loader(cache_dir)  # noqa: F841
             assert cache_dir.exists()
 
     @pytest.mark.unit
@@ -248,7 +247,7 @@ class TestFastF1Loader:
         mock_fastf1.get_event_schedule.return_value = mock_schedule
 
         # This is simplified - actual implementation uses pandas filtering
-        events = enabled_loader.get_season_events(2025)
+        _events = enabled_loader.get_season_events(2025)  # noqa: F841
 
         mock_fastf1.get_event_schedule.assert_called_once_with(2025)
 

@@ -4,7 +4,7 @@ Unit tests for JolpicaClient.
 Run with: pytest tests/test_jolpica.py -v
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -188,11 +188,7 @@ class TestJolpicaClient:
             "MRData": {
                 "StandingsTable": {
                     "StandingsLists": [
-                        {
-                            "DriverStandings": [
-                                {"position": "1", "points": "400", "wins": "15"}
-                            ]
-                        }
+                        {"DriverStandings": [{"position": "1", "points": "400", "wins": "15"}]}
                     ]
                 }
             }
@@ -302,9 +298,7 @@ class TestJolpicaClient:
     @patch.object(JolpicaClient, "get_driver_standings")
     def test_get_driver_context_found(self, mock_standings, mock_search, client):
         """get_driver_context should return formatted context."""
-        mock_search.return_value = Driver(
-            "verstappen", "VER", "Max Verstappen", "Dutch", number=1
-        )
+        mock_search.return_value = Driver("verstappen", "VER", "Max Verstappen", "Dutch", number=1)
         mock_standings.return_value = [
             {"Driver": {"code": "VER"}, "position": "1", "points": "400"}
         ]

@@ -145,7 +145,7 @@ class VectorStore:
         self.chroma_host = chroma_host
         self.chroma_port = chroma_port
         self._client = None
-        self._collections: dict[str, "Collection"] = {}
+        self._collections: dict[str, Collection] = {}
         self._embedding_function = None
 
     def _get_client(self) -> Any:
