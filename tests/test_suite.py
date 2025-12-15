@@ -524,3 +524,183 @@ class TestAgentIntegration:
             system_prompt="You are a helpful assistant.",
         )
         assert "4" in response
+
+
+# ============================================================================
+# Edge Case Tests - Input Validation
+# ============================================================================
+
+
+class TestEdgeCases:
+    """Tests for edge cases and error handling."""
+
+    @pytest.fixture
+    def mock_agent(self):
+        """Create agent with mocked dependencies."""
+        from src.agent.f1_agent import F1Agent
+
+        mock_llm = Mock()
+        mock_retriever = Mock()
+        return F1Agent(mock_llm, mock_retriever)
+
+    @pytest.fixture
+    def mock_retriever(self):
+        """Create retriever with mocked vector store."""
+        from src.rag.retriever import F1Retriever
+
+        mock_vs = Mock()
+        return F1Retriever(mock_vs)
+
+    @pytest.mark.unit
+    def test_agent_empty_query_raises(self, mock_agent):
+        """Agent should raise ValueError for empty query."""
+        with pytest.raises(ValueError, match="empty"):
+            mock_agent.ask("")
+
+    @pytest.mark.unit
+    def test_agent_whitespace_query_raises(self, mock_agent):
+        """Agent should raise ValueError for whitespace-only query."""
+        with pytest.raises(ValueError, match="empty"):
+            mock_agent.ask("   ")
+
+    @pytest.mark.unit
+    def test_agent_stream_empty_query_raises(self, mock_agent):
+        """Agent stream should raise ValueError for empty query."""
+        with pytest.raises(ValueError, match="empty"):
+            # Need to consume the generator to trigger the error
+            list(mock_agent.ask_stream(""))
+
+    @pytest.mark.unit
+    def test_chunking_overlap_too_large_raises(self, mock_retriever):
+        """Chunking should raise if overlap >= chunk_size."""
+        with pytest.raises(ValueError, match="overlap"):
+            mock_retriever.chunk_text("Test text", chunk_size=100, chunk_overlap=100)
+
+    @pytest.mark.unit
+    def test_chunking_overlap_larger_raises(self, mock_retriever):
+        """Chunking should raise if overlap > chunk_size."""
+        with pytest.raises(ValueError, match="overlap"):
+            mock_retriever.chunk_text("Test text", chunk_size=100, chunk_overlap=150)
+
+    @pytest.mark.unit
+    def test_chunking_negative_size_raises(self, mock_retriever):
+        """Chunking should raise for negative chunk_size."""
+        with pytest.raises(ValueError, match="positive"):
+            mock_retriever.chunk_text("Test text", chunk_size=-100)
+
+    @pytest.mark.unit
+    def test_chunking_zero_size_raises(self, mock_retriever):
+        """Chunking should raise for zero chunk_size."""
+        with pytest.raises(ValueError, match="positive"):
+            mock_retriever.chunk_text("Test text", chunk_size=0)
+
+    @pytest.mark.unit
+    def test_chunking_negative_overlap_raises(self, mock_retriever):
+        """Chunking should raise for negative overlap."""
+        with pytest.raises(ValueError, match="non-negative"):
+            mock_retriever.chunk_text("Test text", chunk_size=100, chunk_overlap=-10)
+
+    @pytest.mark.unit
+    def test_empty_context_returns_message(self):
+        """Empty RetrievalContext should return informative message."""
+        from src.rag.retriever import RetrievalContext
+
+        ctx = RetrievalContext(regulations=[], stewards_decisions=[], race_data=[], query="test")
+        result = ctx.get_combined_context()
+        assert "No specific regulatory context" in result
+
+    @pytest.mark.unit
+    def test_year_extraction_2030_and_beyond(self, mock_retriever):
+        """Year extraction should work for years beyond 2029."""
+        context = mock_retriever.extract_race_context("Penalties in the 2035 season")
+        assert context.get("season") == 2035
+
+    @pytest.mark.unit
+    def test_year_extraction_validates_range(self, mock_retriever):
+        """Year extraction should validate reasonable F1 range."""
+        # Years too far in the past (pre-2000) should not be extracted
+        context = mock_retriever.extract_race_context("Penalties in 1950")
+        assert context.get("season") is None
+
+    @pytest.mark.unit
+    def test_year_extraction_out_of_range(self, mock_retriever):
+        """Year extraction should reject invalid years like 2100."""
+        context = mock_retriever.extract_race_context("F1 in 2100")
+        assert context.get("season") is None
+
+    @pytest.mark.unit
+    def test_unicode_query_handling(self, mock_agent):
+        """Agent should handle unicode characters in queries."""
+        from src.agent.f1_agent import QueryType
+
+        # Test with accented characters
+        result = mock_agent.classify_query("Why did Pérez get a penalty?")
+        assert result == QueryType.PENALTY_EXPLANATION
+
+    @pytest.mark.unit
+    def test_case_insensitive_driver_extraction(self, mock_retriever):
+        """Driver extraction should be case insensitive."""
+        context = mock_retriever.extract_race_context("VERSTAPPEN penalty")
+        assert context.get("driver") == "Max Verstappen"
+
+        context = mock_retriever.extract_race_context("hamilton collision")
+        assert context.get("driver") == "Lewis Hamilton"
+
+
+# ============================================================================
+# Retrieval Context Tests - Extended
+# ============================================================================
+
+
+class TestRetrievalContextExtended:
+    """Extended tests for RetrievalContext."""
+
+    @pytest.mark.unit
+    def test_context_max_chars_limit(self):
+        """Context should respect max_chars limit."""
+        from src.rag.retriever import RetrievalContext
+        from src.rag.vectorstore import Document, SearchResult
+
+        # Create large content
+        large_content = "A" * 5000
+        doc = Document(content=large_content, metadata={"source": "Test"})
+        result = SearchResult(document=doc, score=0.9)
+
+        ctx = RetrievalContext(
+            regulations=[result, result, result],
+            stewards_decisions=[],
+            race_data=[],
+            query="test",
+        )
+
+        # With default 8000 char limit, should truncate after ~1-2 results
+        combined = ctx.get_combined_context(max_chars=6000)
+        # Should include header plus at least one result but not all
+        assert "FIA REGULATIONS" in combined
+        assert len(combined) < 20000  # Much less than 3 * 5000
+
+    @pytest.mark.unit
+    def test_context_includes_all_sections(self):
+        """Context should include all three sections when available."""
+        from src.rag.retriever import RetrievalContext
+        from src.rag.vectorstore import Document, SearchResult
+
+        reg_doc = Document(content="Regulation content", metadata={"source": "FIA Regs"})
+        steward_doc = Document(content="Steward decision", metadata={"event": "Monaco"})
+        race_doc = Document(content="Race control message", metadata={})
+
+        ctx = RetrievalContext(
+            regulations=[SearchResult(document=reg_doc, score=0.9)],
+            stewards_decisions=[SearchResult(document=steward_doc, score=0.8)],
+            race_data=[SearchResult(document=race_doc, score=0.7)],
+            query="test",
+        )
+
+        combined = ctx.get_combined_context()
+
+        assert "FIA REGULATIONS" in combined
+        assert "STEWARDS DECISIONS" in combined
+        assert "RACE CONTROL MESSAGES" in combined
+        assert "Regulation content" in combined
+        assert "Steward decision" in combined
+        assert "Race control message" in combined

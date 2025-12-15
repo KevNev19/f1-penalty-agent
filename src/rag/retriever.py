@@ -1,5 +1,6 @@
 """Document retriever with text chunking and context building."""
 
+import hashlib
 import re
 from dataclasses import dataclass
 
@@ -28,7 +29,7 @@ class RetrievalContext:
             max_chars: Maximum characters to include.
 
         Returns:
-            Formatted context string.
+            Formatted context string, or informative message if no context found.
         """
         parts = []
         char_count = 0
@@ -65,6 +66,10 @@ class RetrievalContext:
                 parts.append(f"\n{content}")
                 char_count += len(content)
 
+        # Return informative message if no context found
+        if not parts:
+            return "No specific regulatory context found for this query. Please provide a general response based on F1 knowledge."
+
         return "\n".join(parts)
 
 
@@ -89,12 +94,22 @@ class F1Retriever:
 
         Args:
             text: Text to chunk.
-            chunk_size: Target size of each chunk.
-            chunk_overlap: Overlap between consecutive chunks.
+            chunk_size: Target size of each chunk (must be positive).
+            chunk_overlap: Overlap between consecutive chunks (must be less than chunk_size).
 
         Returns:
             List of text chunks.
+
+        Raises:
+            ValueError: If chunk_overlap >= chunk_size or parameters are invalid.
         """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if chunk_overlap < 0:
+            raise ValueError("chunk_overlap must be non-negative")
+        if chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be less than chunk_size to avoid infinite loop")
+
         if len(text) <= chunk_size:
             return [text]
 
@@ -145,6 +160,8 @@ class F1Retriever:
         chunks = self.chunk_text(document.text_content, chunk_size, chunk_overlap)
 
         # Create Document objects with metadata
+        # Use hash of full title + URL to avoid ID collisions
+        title_hash = hashlib.md5(f"{document.title}_{document.url}".encode()).hexdigest()[:8]
         docs = []
         for i, chunk in enumerate(chunks):
             doc = Document(
@@ -157,7 +174,7 @@ class F1Retriever:
                     "chunk_index": i,
                     "url": document.url,
                 },
-                doc_id=f"{document.doc_type}_{document.title[:30]}_{i}".replace(" ", "_"),
+                doc_id=f"{document.doc_type}_{title_hash}_{i}",
             )
             docs.append(doc)
 
@@ -191,6 +208,10 @@ Message: {event.message}
 {event.details or ""}
         """.strip()
 
+        # Use hash to create unique doc_id and avoid collisions
+        msg_hash = hashlib.md5(
+            f"{event.race_name}_{event.season}_{event.message}".encode()
+        ).hexdigest()[:8]
         doc = Document(
             content=content,
             metadata={
@@ -200,9 +221,7 @@ Message: {event.message}
                 "category": event.category,
                 "driver": event.driver or "",
             },
-            doc_id=f"penalty_{event.race_name}_{event.season}_{event.message[:30]}".replace(
-                " ", "_"
-            ),
+            doc_id=f"penalty_{event.race_name}_{event.season}_{msg_hash}".replace(" ", "_"),
         )
 
         return self.vector_store.add_documents([doc], VectorStore.RACE_DATA_COLLECTION)
@@ -320,9 +339,12 @@ Message: {event.message}
                 context["race"] = race
                 break
 
-        # Season/year
-        year_match = re.search(r"\b(202[0-9])\b", query)
+        # Season/year - support years from 2000 onwards
+        year_match = re.search(r"\b(20[0-9]{2})\b", query)
         if year_match:
-            context["season"] = int(year_match.group(1))
+            year = int(year_match.group(1))
+            # Validate reasonable F1 season range (F1 started in 1950, but modern era starts ~2000)
+            if 2000 <= year <= 2099:
+                context["season"] = year
 
         return context

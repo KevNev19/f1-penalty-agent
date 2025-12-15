@@ -1,4 +1,13 @@
-"""Embedding model for converting text to vectors."""
+"""Embedding model for converting text to vectors.
+
+NOTE: This module is deprecated. The codebase now uses GeminiEmbeddingFunction
+in vectorstore.py for embeddings. This module is kept for backwards compatibility
+but may be removed in a future version.
+
+Use GeminiEmbeddingFunction from vectorstore.py instead.
+"""
+
+import warnings
 
 from rich.console import Console
 
@@ -6,7 +15,11 @@ console = Console()
 
 
 class EmbeddingModel:
-    """Wrapper for sentence-transformers embedding model."""
+    """Wrapper for sentence-transformers embedding model.
+
+    .. deprecated::
+        This class is deprecated. Use GeminiEmbeddingFunction from vectorstore.py instead.
+    """
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         """Initialize the embedding model.
@@ -15,6 +28,11 @@ class EmbeddingModel:
             model_name: Name of the sentence-transformers model to use.
                         Default is all-MiniLM-L6-v2 (fast, good quality, 384 dims).
         """
+        warnings.warn(
+            "EmbeddingModel is deprecated. Use GeminiEmbeddingFunction from vectorstore.py instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.model_name = model_name
         self._model = None
 

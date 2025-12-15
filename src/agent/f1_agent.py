@@ -178,7 +178,13 @@ class F1Agent:
 
         Returns:
             AgentResponse with the answer and metadata.
+
+        Raises:
+            ValueError: If query is empty or whitespace only.
         """
+        if not query or not query.strip():
+            raise ValueError("Query cannot be empty or whitespace only")
+
         console.print("[dim]Analyzing question...[/]")
 
         # Classify the query
@@ -221,7 +227,13 @@ class F1Agent:
 
         Returns:
             Final AgentResponse.
+
+        Raises:
+            ValueError: If query is empty or whitespace only.
         """
+        if not query or not query.strip():
+            raise ValueError("Query cannot be empty or whitespace only")
+
         query_type = self.classify_query(query)
         context = self.retriever.retrieve(query, top_k=5)
         prompt = self.build_prompt(query, query_type, context)

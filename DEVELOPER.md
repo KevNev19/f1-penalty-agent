@@ -65,7 +65,7 @@ cp .env.example .env
 ### Run Tests
 
 ```bash
-# Unit tests only (43 tests, no external deps)
+# Unit tests only (98 tests, no external deps)
 poetry run pytest tests/ -m unit -v
 
 # Integration tests (requires ChromaDB + API key)

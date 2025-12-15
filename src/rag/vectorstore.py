@@ -1,12 +1,17 @@
 """Vector store for document storage and retrieval using ChromaDB."""
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
+if TYPE_CHECKING:
+    from chromadb.api.models.Collection import Collection
+
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,21 +52,25 @@ class GeminiEmbeddingFunction:
             self._model = genai
         return self._model
 
-    def __call__(self, input: list[str]) -> list[list[float]]:
+    def __call__(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for the input texts (for documents).
 
         This is called by ChromaDB to generate embeddings for indexing.
-        """
-        return self._embed_texts(input, task_type="retrieval_document")
 
-    def embed_query(self, input: str) -> list[float]:
+        Args:
+            texts: List of document texts to embed.
+        """
+        return self._embed_texts(texts, task_type="retrieval_document")
+
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text.
 
         This is called by ChromaDB when performing searches.
+
         Args:
-            input: The query text to embed.
+            text: The query text to embed.
         """
-        embeddings = self._embed_texts([input], task_type="retrieval_query")
+        embeddings = self._embed_texts([text], task_type="retrieval_query")
         return embeddings[0] if embeddings else [0.0] * 768
 
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
@@ -136,7 +145,7 @@ class VectorStore:
         self.chroma_host = chroma_host
         self.chroma_port = chroma_port
         self._client = None
-        self._collections: dict[str, Any] = {}
+        self._collections: dict[str, "Collection"] = {}
         self._embedding_function = None
 
     def _get_client(self) -> Any:
@@ -292,7 +301,7 @@ class VectorStore:
         # For HttpClient, generate query embedding client-side
         if self.chroma_host:
             ef = self._get_embedding_function()
-            query_embedding = ef.embed_query(input=query)
+            query_embedding = ef.embed_query(text=query)
             results = collection.query(
                 query_embeddings=[query_embedding],
                 n_results=top_k,
@@ -354,9 +363,12 @@ class VectorStore:
             try:
                 results = self.search(query, collection_name, top_k)
                 all_results.extend(results)
-            except Exception:
-                # Collection might not exist yet
-                pass
+            except ValueError:
+                # Collection doesn't exist yet - this is expected during initial setup
+                logger.debug(f"Collection {collection_name} not found, skipping")
+            except Exception as e:
+                # Log unexpected errors but continue with other collections
+                logger.warning(f"Search failed for collection {collection_name}: {e}")
 
         # Sort by score and return top results
         all_results.sort(key=lambda x: x.score, reverse=True)
@@ -377,8 +389,12 @@ class VectorStore:
                 "name": collection_name,
                 "count": collection.count(),
             }
-        except Exception:
+        except ValueError:
+            # Collection doesn't exist
             return {"name": collection_name, "count": 0}
+        except Exception as e:
+            logger.warning(f"Failed to get stats for collection {collection_name}: {e}")
+            return {"name": collection_name, "count": 0, "error": str(e)}
 
     def clear_collection(self, collection_name: str) -> None:
         """Clear all documents from a collection.
@@ -392,5 +408,8 @@ class VectorStore:
             if collection_name in self._collections:
                 del self._collections[collection_name]
             console.print(f"[yellow]Cleared collection: {collection_name}[/]")
-        except Exception:
-            pass
+        except ValueError:
+            # Collection doesn't exist - nothing to clear
+            logger.debug(f"Collection {collection_name} does not exist, nothing to clear")
+        except Exception as e:
+            logger.warning(f"Failed to clear collection {collection_name}: {e}")
