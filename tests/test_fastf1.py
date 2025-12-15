@@ -126,14 +126,10 @@ class TestFastF1Loader:
         assert events == []
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_race_control_messages_success(self, mock_fastf1, enabled_loader):
+    def test_get_race_control_messages_success(self, enabled_loader):
         """Should parse race control messages correctly."""
         # Create mock session with race control messages
         mock_session = MagicMock()
-        mock_fastf1.get_session.return_value = mock_session
-
-        # Create mock DataFrame-like object
         mock_rcm = MagicMock()
         mock_rcm.iterrows.return_value = iter(
             [
@@ -144,7 +140,11 @@ class TestFastF1Loader:
         )
         mock_session.race_control_messages = mock_rcm
 
-        events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
+        mock_fastf1 = MagicMock()
+        mock_fastf1.get_session.return_value = mock_session
+
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
 
         assert len(events) == 3
         assert events[0].category == "Investigation"
@@ -152,33 +152,34 @@ class TestFastF1Loader:
         assert events[2].category == "Track Limits"
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_race_control_messages_no_messages(self, mock_fastf1, enabled_loader):
+    def test_get_race_control_messages_no_messages(self, enabled_loader):
         """Should handle session without race control messages."""
         mock_session = MagicMock()
         mock_session.race_control_messages = None
+
+        mock_fastf1 = MagicMock()
         mock_fastf1.get_session.return_value = mock_session
 
-        events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
 
         assert events == []
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_race_control_messages_error(self, mock_fastf1, enabled_loader):
+    def test_get_race_control_messages_error(self, enabled_loader):
         """Should handle errors gracefully."""
+        mock_fastf1 = MagicMock()
         mock_fastf1.get_session.side_effect = Exception("Session load error")
 
-        events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            events = enabled_loader.get_race_control_messages(2025, "Bahrain", "Race")
 
         assert events == []
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_race_results_success(self, mock_fastf1, enabled_loader):
+    def test_get_race_results_success(self, enabled_loader):
         """Should parse race results correctly."""
         mock_session = MagicMock()
-        mock_fastf1.get_session.return_value = mock_session
 
         mock_results = MagicMock()
         mock_results.iterrows.return_value = iter(
@@ -207,7 +208,11 @@ class TestFastF1Loader:
         )
         mock_session.results = mock_results
 
-        results = enabled_loader.get_race_results(2025, "Bahrain")
+        mock_fastf1 = MagicMock()
+        mock_fastf1.get_session.return_value = mock_session
+
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            results = enabled_loader.get_race_results(2025, "Bahrain")
 
         assert len(results) == 2
         assert results[0].position == 1
@@ -215,20 +220,21 @@ class TestFastF1Loader:
         assert results[0].points == 25.0
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_race_results_no_results(self, mock_fastf1, enabled_loader):
+    def test_get_race_results_no_results(self, enabled_loader):
         """Should handle session without results."""
         mock_session = MagicMock()
         mock_session.results = None
+
+        mock_fastf1 = MagicMock()
         mock_fastf1.get_session.return_value = mock_session
 
-        results = enabled_loader.get_race_results(2025, "Bahrain")
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            results = enabled_loader.get_race_results(2025, "Bahrain")
 
         assert results == []
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_season_events_success(self, mock_fastf1, enabled_loader):
+    def test_get_season_events_success(self, enabled_loader):
         """Should return list of race names."""
         mock_schedule = MagicMock()
         # Simulate DataFrame filtering
@@ -244,20 +250,23 @@ class TestFastF1Loader:
         ]
         mock_schedule.__getitem__ = MagicMock(return_value=mock_races)
 
+        mock_fastf1 = MagicMock()
         mock_fastf1.get_event_schedule.return_value = mock_schedule
 
         # This is simplified - actual implementation uses pandas filtering
-        _events = enabled_loader.get_season_events(2025)  # noqa: F841
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            _events = enabled_loader.get_season_events(2025)  # noqa: F841
 
         mock_fastf1.get_event_schedule.assert_called_once_with(2025)
 
     @pytest.mark.unit
-    @patch("src.data.fastf1_loader.fastf1")
-    def test_get_season_events_error(self, mock_fastf1, enabled_loader):
+    def test_get_season_events_error(self, enabled_loader):
         """Should handle errors when getting schedule."""
+        mock_fastf1 = MagicMock()
         mock_fastf1.get_event_schedule.side_effect = Exception("API error")
 
-        events = enabled_loader.get_season_events(2025)
+        with patch.dict("sys.modules", {"fastf1": mock_fastf1}):
+            events = enabled_loader.get_season_events(2025)
 
         assert events == []
 

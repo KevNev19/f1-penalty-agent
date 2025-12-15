@@ -322,8 +322,10 @@ class TestJolpicaClient:
     @pytest.mark.unit
     def test_get_request_error_handling(self, client):
         """_get should handle request errors gracefully."""
+        import requests
+
         with patch.object(client.session, "get") as mock_get:
-            mock_get.side_effect = Exception("Network error")
+            mock_get.side_effect = requests.RequestException("Network error")
 
             result = client._get("test/endpoint")
 
