@@ -246,7 +246,7 @@ class TestTextChunking:
     def test_chunk_short_text(self, mock_retriever):
         """Short text should return single chunk."""
         short_text = "This is a short text."
-        chunks = mock_retriever.chunk_text(short_text, chunk_size=100)
+        chunks = mock_retriever.chunk_text(short_text, chunk_size=100, chunk_overlap=50)
         assert len(chunks) == 1
         assert chunks[0] == short_text
 
