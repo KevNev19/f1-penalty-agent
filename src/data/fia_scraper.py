@@ -3,14 +3,13 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 from rich.console import Console
-from rich.progress import Progress, TaskID
+from rich.progress import Progress
 
 console = Console()
 
@@ -22,10 +21,10 @@ class FIADocument:
     title: str
     url: str
     doc_type: str  # "regulation", "stewards_decision", "guidelines"
-    event_name: Optional[str] = None  # For stewards decisions
+    event_name: str | None = None  # For stewards decisions
     season: int = 2025
-    local_path: Optional[Path] = None
-    text_content: Optional[str] = None
+    local_path: Path | None = None
+    text_content: str | None = None
 
 
 class FIAScraper:
@@ -98,7 +97,7 @@ class FIAScraper:
         return documents
 
     def scrape_stewards_decisions(
-        self, season: int = 2025, race_name: Optional[str] = None
+        self, season: int = 2025, race_name: str | None = None
     ) -> list[FIADocument]:
         """Scrape stewards decisions for a season or specific race.
 

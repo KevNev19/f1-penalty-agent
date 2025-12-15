@@ -1,7 +1,5 @@
 """CLI interface for the F1 Penalty Agent."""
 
-from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -19,11 +17,11 @@ console = Console()
 
 def get_agent():
     """Get or create the F1 agent instance."""
+    from ..agent.f1_agent import F1Agent
     from ..config import settings
     from ..llm.gemini_client import GeminiClient
     from ..rag.retriever import F1Retriever
     from ..rag.vectorstore import VectorStore
-    from ..agent.f1_agent import F1Agent
 
     settings.ensure_directories()
 
@@ -129,7 +127,7 @@ def ask(
 
 @app.command()
 def setup(
-    chroma_host: Optional[str] = typer.Option(
+    chroma_host: str | None = typer.Option(
         None, "--chroma-host", "-h",
         help="ChromaDB server host (for K8s mode). Default: use local PersistentClient."
     ),
@@ -140,8 +138,8 @@ def setup(
 ):
     """Download and index F1 regulations and data."""
     from ..config import settings
-    from ..data.fia_scraper import FIAScraper
     from ..data.fastf1_loader import FastF1Loader
+    from ..data.fia_scraper import FIAScraper
     from ..rag.retriever import F1Retriever
     from ..rag.vectorstore import VectorStore
 

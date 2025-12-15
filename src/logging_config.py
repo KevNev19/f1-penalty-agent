@@ -3,12 +3,11 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 def setup_logging(
     level: str = "INFO",
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     json_format: bool = False,
 ) -> logging.Logger:
     """Configure structured logging for the application.
@@ -58,7 +57,7 @@ def setup_logging(
 logger = setup_logging()
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """Get a logger instance.
     
     Args:

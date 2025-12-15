@@ -7,10 +7,10 @@ Test markers:
   - integration: Requires ChromaDB and/or API key
   - slow: Tests that take longer (API calls)
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
+import pytest
 
 # ============================================================================
 # Configuration Tests
@@ -365,9 +365,9 @@ class TestPrompts:
         """Prompt templates should be defined."""
         from src.agent.prompts import (
             F1_SYSTEM_PROMPT,
+            GENERAL_F1_PROMPT,
             PENALTY_EXPLANATION_PROMPT,
             RULE_LOOKUP_PROMPT,
-            GENERAL_F1_PROMPT,
         )
         assert len(F1_SYSTEM_PROMPT) > 100
         assert PENALTY_EXPLANATION_PROMPT is not None
@@ -456,7 +456,7 @@ class TestVectorStore:
     @pytest.mark.integration
     def test_vectorstore_add_document(self, api_key):
         """VectorStore should add documents."""
-        from src.rag.vectorstore import VectorStore, Document
+        from src.rag.vectorstore import Document, VectorStore
         vs = VectorStore(
             Path("data/test"),
             api_key,
@@ -474,7 +474,7 @@ class TestVectorStore:
     @pytest.mark.integration
     def test_vectorstore_search(self, api_key):
         """VectorStore should search and return results."""
-        from src.rag.vectorstore import VectorStore, Document
+        from src.rag.vectorstore import Document, VectorStore
         vs = VectorStore(
             Path("data/test"),
             api_key,

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -15,13 +14,13 @@ class PenaltyEvent:
     """Represents a penalty or investigation from race control."""
 
     message: str
-    driver: Optional[str]
-    time: Optional[datetime]
+    driver: str | None
+    time: datetime | None
     category: str  # "Investigation", "Penalty", "Track Limits", "Black/White Flag", etc.
     session: str  # "Race", "Qualifying", "Sprint", etc.
     race_name: str
     season: int
-    details: Optional[str] = None
+    details: str | None = None
 
 
 @dataclass

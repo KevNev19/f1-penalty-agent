@@ -1,6 +1,6 @@
 """Google Gemini API client for LLM inference."""
 
-from typing import Generator, Optional
+from collections.abc import Generator
 
 from rich.console import Console
 
@@ -41,7 +41,7 @@ class GeminiClient:
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
         max_retries: int = 3,
@@ -104,7 +104,7 @@ class GeminiClient:
     def generate_stream(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
     ) -> Generator[str, None, None]:
         """Generate a streaming response from the LLM.

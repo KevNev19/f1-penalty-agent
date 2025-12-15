@@ -1,7 +1,6 @@
 """Jolpica API client for F1 driver and race data (Ergast successor)."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 import requests
 from rich.console import Console
@@ -17,8 +16,8 @@ class Driver:
     code: str
     name: str
     nationality: str
-    team: Optional[str] = None
-    number: Optional[int] = None
+    team: str | None = None
+    number: int | None = None
 
 
 @dataclass
@@ -45,7 +44,7 @@ class JolpicaClient:
             "User-Agent": "F1-Penalty-Agent/1.0"
         })
 
-    def _get(self, endpoint: str) -> Optional[dict]:
+    def _get(self, endpoint: str) -> dict | None:
         """Make a GET request to the API.
 
         Args:
@@ -169,7 +168,7 @@ class JolpicaClient:
 
         return []
 
-    def search_driver(self, query: str, season: int = 2025) -> Optional[Driver]:
+    def search_driver(self, query: str, season: int = 2025) -> Driver | None:
         """Search for a driver by name, code, or number.
 
         Args:

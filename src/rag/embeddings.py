@@ -1,8 +1,6 @@
 """Embedding model for converting text to vectors."""
 
-from typing import Optional
 
-import numpy as np
 from rich.console import Console
 
 console = Console()

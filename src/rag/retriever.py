@@ -2,13 +2,11 @@
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
-from ..data.fia_scraper import FIADocument
 from ..data.fastf1_loader import PenaltyEvent
+from ..data.fia_scraper import FIADocument
 from .vectorstore import Document, SearchResult, VectorStore
 
 console = Console()

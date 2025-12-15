@@ -60,6 +60,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = ["E501"]  # Allow long lines in prompt strings
 
 [tool.mypy]
 python_version = "3.12"

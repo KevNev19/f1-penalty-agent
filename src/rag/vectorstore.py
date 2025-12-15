@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -15,7 +15,7 @@ class Document:
 
     content: str
     metadata: dict[str, Any]
-    doc_id: Optional[str] = None
+    doc_id: str | None = None
 
 
 @dataclass
@@ -114,8 +114,8 @@ class VectorStore:
     def __init__(
         self, 
         persist_dir: Path, 
-        api_key: Optional[str] = None,
-        chroma_host: Optional[str] = None,
+        api_key: str | None = None,
+        chroma_host: str | None = None,
         chroma_port: int = 8000,
     ) -> None:
         """Initialize the vector store.
@@ -270,7 +270,7 @@ class VectorStore:
         query: str,
         collection_name: str = REGULATIONS_COLLECTION,
         top_k: int = 5,
-        filter_metadata: Optional[dict] = None,
+        filter_metadata: dict | None = None,
     ) -> list[SearchResult]:
         """Search for relevant documents.
 

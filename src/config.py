@@ -1,7 +1,6 @@
 """Configuration management for F1 Penalty Agent."""
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,7 +23,7 @@ class Settings(BaseSettings):
 
     # ChromaDB settings
     chroma_persist_dir: Path = Path("./data/chroma")
-    chroma_host: Optional[str] = None  # Set to "localhost" for K8s mode
+    chroma_host: str | None = None  # Set to "localhost" for K8s mode
     chroma_port: int = 8000
 
     # Model settings

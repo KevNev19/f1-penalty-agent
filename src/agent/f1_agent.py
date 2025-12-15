@@ -1,9 +1,9 @@
 """F1 Penalty Agent - main agent orchestration."""
 
 import re
+from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator, Optional
 
 from rich.console import Console
 
@@ -34,7 +34,7 @@ class AgentResponse:
     answer: str
     query_type: QueryType
     sources_used: list[str]
-    context: Optional[RetrievalContext] = None
+    context: RetrievalContext | None = None
 
 
 class F1Agent:
@@ -179,7 +179,7 @@ class F1Agent:
         Returns:
             AgentResponse with the answer and metadata.
         """
-        console.print(f"[dim]Analyzing question...[/]")
+        console.print("[dim]Analyzing question...[/]")
 
         # Classify the query
         query_type = self.classify_query(query)
@@ -190,14 +190,14 @@ class F1Agent:
         console.print(f"[dim]Detected context: {query_context}[/]")
 
         # Retrieve relevant documents
-        console.print(f"[dim]Searching knowledge base...[/]")
+        console.print("[dim]Searching knowledge base...[/]")
         context = self.retriever.retrieve(query, top_k=5)
 
         # Build prompt
         prompt = self.build_prompt(query, query_type, context)
 
         # Generate response
-        console.print(f"[dim]Generating response...[/]")
+        console.print("[dim]Generating response...[/]")
         answer = self.llm.generate(prompt, system_prompt=F1_SYSTEM_PROMPT)
 
         # Get sources

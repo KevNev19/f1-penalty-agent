@@ -2,10 +2,10 @@
 Tests for infrastructure setup script.
 These tests verify the helper functions without actually deploying resources.
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ============================================================================
 # Infrastructure Script Tests
@@ -144,8 +144,9 @@ class TestKubernetesManifests:
     @pytest.mark.unit
     def test_namespace_yaml_valid(self):
         """namespace.yaml should be valid YAML with correct structure."""
-        import yaml
         from pathlib import Path
+
+        import yaml
         
         content = Path("infra/k8s/namespace.yaml").read_text()
         data = yaml.safe_load(content)
@@ -157,8 +158,9 @@ class TestKubernetesManifests:
     @pytest.mark.unit
     def test_deployment_has_required_resources(self):
         """ChromaDB deployment should have resource limits."""
-        import yaml
         from pathlib import Path
+
+        import yaml
         
         content = Path("infra/k8s/chromadb/deployment.yaml").read_text()
         docs = list(yaml.safe_load_all(content))
@@ -180,8 +182,9 @@ class TestKubernetesManifests:
     @pytest.mark.unit
     def test_deployment_has_health_probes(self):
         """ChromaDB deployment should have liveness and readiness probes."""
-        import yaml
         from pathlib import Path
+
+        import yaml
         
         content = Path("infra/k8s/chromadb/deployment.yaml").read_text()
         docs = list(yaml.safe_load_all(content))
@@ -199,8 +202,9 @@ class TestKubernetesManifests:
     @pytest.mark.unit
     def test_service_has_correct_port(self):
         """ChromaDB service should expose port 8000."""
-        import yaml
         from pathlib import Path
+
+        import yaml
         
         content = Path("infra/k8s/chromadb/deployment.yaml").read_text()
         docs = list(yaml.safe_load_all(content))
