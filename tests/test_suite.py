@@ -452,7 +452,7 @@ class TestGeminiEmbeddings:
         from src.rag.vectorstore import GeminiEmbeddingFunction
 
         ef = GeminiEmbeddingFunction(api_key)
-        result = ef.embed_query(input="test query")
+        result = ef.embed_query(text="test query")
         assert len(result) == 768
 
 
