@@ -24,6 +24,63 @@ This document outlines the current state of the F1 Penalty Agent POC and the imp
 | Context-Aware Retrieval | Season/race metadata filtering | Better relevance |
 | **Streamlit Chat UI** | Web-based chat interface with F1 theming | User-facing |
 
+### ⚠️ Known Limitations
+
+#### Data Coverage: Stewards Decisions (Critical for Season-Wide Queries)
+
+**Issue:** The FIA scraper currently only retrieves stewards decisions from the **most recent race** (Abu Dhabi 2025), not the entire season.
+
+| Collection | Documents | Coverage |
+|------------|-----------|----------|
+| Regulations | 32,127 | ✅ Full (2025 + 2026) |
+| Stewards Decisions | 456 | ⚠️ **Abu Dhabi 2025 only** |
+| Race Data | 68 | Partial (FastF1 messages) |
+
+**Root Cause:**
+```python
+# Current URL only shows most recent race
+DECISIONS_BASE_URL = "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14"
+```
+
+The FIA website shows documents per-event. The main page only lists the most recent race.
+
+**Impact:**
+- Queries like "What penalties did Norris get in 2025?" only return Abu Dhabi data
+- Users expect full season coverage but POC only has one race
+
+**Fix Required (2-3 hours):**
+
+Modify `src/data/fia_scraper.py` to iterate through each race event:
+
+```python
+# Add race event URLs for 2025 season
+RACE_EVENTS_2025 = [
+    "bahrain-grand-prix",
+    "saudi-arabian-grand-prix",
+    "australian-grand-prix",
+    "japanese-grand-prix",
+    "chinese-grand-prix",
+    "miami-grand-prix",
+    "emilia-romagna-grand-prix",
+    "monaco-grand-prix",
+    # ... all 24 races
+    "abu-dhabi-grand-prix",
+]
+
+def scrape_all_race_decisions(self, season: int = 2025) -> list[FIADocument]:
+    """Scrape stewards decisions from ALL race events in a season."""
+    all_docs = []
+    for race in RACE_EVENTS_2025:
+        event_url = f"{self.FIA_BASE_URL}/documents/season/season-2025-702/event-{race}"
+        docs = self.scrape_event_decisions(event_url)
+        all_docs.extend(docs)
+    return all_docs
+```
+
+**Expected Result After Fix:**
+- 24 races × ~20-40 decisions per race = **500-800+ stewards decisions**
+- Full season coverage for penalty queries
+
 ---
 
 ## Frontend Implementation
