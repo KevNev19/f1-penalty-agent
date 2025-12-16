@@ -76,6 +76,28 @@ class RetrievalContext:
 class F1Retriever:
     """Retrieves relevant F1 documents for answering questions."""
 
+    # F1-specific synonyms for query expansion
+    F1_SYNONYMS = {
+        "penalty": ["sanction", "punishment", "time penalty", "grid penalty", "reprimand"],
+        "5 second": ["five second", "5s", "five-second"],
+        "10 second": ["ten second", "10s", "ten-second"],
+        "track limits": ["track boundaries", "running wide", "exceeding track limits", "leaving the track"],
+        "impeding": ["blocking", "held up", "obstructing", "getting in the way"],
+        "unsafe release": ["dangerous release", "pit release", "pit lane incident"],
+        "collision": ["crash", "contact", "incident", "accident", "hit"],
+        "overtaking": ["passing", "overtake", "pass"],
+        "qualifying": ["quali", "Q1", "Q2", "Q3"],
+        "DRS": ["drag reduction system", "rear wing"],
+        "parc ferme": ["parc fermé", "post-race", "impound"],
+        "grid": ["starting grid", "starting position", "grid position"],
+        "stewards": ["race stewards", "FIA stewards", "officials"],
+        "reprimand": ["warning", "formal warning"],
+        "disqualification": ["DSQ", "disqualified", "excluded"],
+        "black flag": ["disqualification flag", "black flag meatball"],
+        "safety car": ["SC", "virtual safety car", "VSC"],
+        "red flag": ["race stopped", "session stopped"],
+    }
+
     def __init__(self, vector_store: VectorStore) -> None:
         """Initialize the retriever.
 
@@ -83,6 +105,82 @@ class F1Retriever:
             vector_store: VectorStore instance for document retrieval.
         """
         self.vector_store = vector_store
+
+    def expand_query(self, query: str) -> str:
+        """Expand query with F1-specific synonyms for better retrieval.
+
+        Args:
+            query: Original user query.
+
+        Returns:
+            Expanded query with relevant synonyms added.
+        """
+        query_lower = query.lower()
+        expansions = []
+
+        for term, synonyms in self.F1_SYNONYMS.items():
+            if term in query_lower:
+                # Add relevant synonyms (limit to 2 to avoid query dilution)
+                expansions.extend(synonyms[:2])
+
+        if expansions:
+            # Append expansions to original query
+            return f"{query} {' '.join(expansions)}"
+        return query
+
+    def boost_keyword_matches(
+        self, results: list[SearchResult], query: str
+    ) -> list[SearchResult]:
+        """Boost scores for results that contain exact keyword matches.
+
+        Args:
+            results: List of search results.
+            query: Original query to check for keyword matches.
+
+        Returns:
+            Results with adjusted scores for keyword matches.
+        """
+        keywords = [w.lower() for w in query.split() if len(w) > 3]
+
+        for result in results:
+            content_lower = result.document.content.lower()
+            match_count = sum(1 for kw in keywords if kw in content_lower)
+
+            # Boost score by up to 10% based on keyword matches
+            if match_count > 0:
+                boost = min(0.1, match_count * 0.02)  # 2% per keyword, max 10%
+                result.score = min(1.0, result.score + boost)
+
+        # Re-sort by boosted scores
+        results.sort(key=lambda x: x.score, reverse=True)
+        return results
+
+    def deduplicate_results(
+        self, results: list[SearchResult]
+    ) -> list[SearchResult]:
+        """Remove duplicate results based on source and content similarity.
+
+        Args:
+            results: List of search results (already sorted by score).
+
+        Returns:
+            Deduplicated list of results.
+        """
+        seen_sources = set()
+        deduplicated = []
+
+        for result in results:
+            # Create a source key for deduplication
+            source = result.document.metadata.get("source", "")
+            # Use first 200 chars of content as part of the key
+            content_key = result.document.content[:200] if result.document.content else ""
+            dedup_key = f"{source}:{hash(content_key)}"
+
+            if dedup_key not in seen_sources:
+                seen_sources.add(dedup_key)
+                deduplicated.append(result)
+
+        return deduplicated
 
     def chunk_text(
         self,
@@ -253,6 +351,9 @@ Message: {event.message}
         stewards = []
         race_data = []
 
+        # Expand query with F1 synonyms for better retrieval
+        expanded_query = self.expand_query(query)
+
         # Build metadata filters from query context
         # Note: ChromaDB supports $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin
         # For text matching in content, we rely on the embedding search instead
@@ -270,30 +371,39 @@ Message: {event.message}
         if include_regulations:
             # Regulations don't use context filters (search all)
             regulations = self.vector_store.search(
-                query, VectorStore.REGULATIONS_COLLECTION, top_k
+                expanded_query, VectorStore.REGULATIONS_COLLECTION, top_k
             )
+            # Apply keyword boosting and deduplication
+            regulations = self.boost_keyword_matches(regulations, query)
+            regulations = self.deduplicate_results(regulations)[:top_k]
 
         if include_stewards:
             # Try with filter first, fallback to no filter if no results
             stewards = self.vector_store.search(
-                query, VectorStore.STEWARDS_COLLECTION, top_k, stewards_filter
+                expanded_query, VectorStore.STEWARDS_COLLECTION, top_k, stewards_filter
             )
             # If no results with filter, try without filter
             if not stewards and stewards_filter:
                 stewards = self.vector_store.search(
-                    query, VectorStore.STEWARDS_COLLECTION, top_k
+                    expanded_query, VectorStore.STEWARDS_COLLECTION, top_k
                 )
+            # Apply keyword boosting and deduplication
+            stewards = self.boost_keyword_matches(stewards, query)
+            stewards = self.deduplicate_results(stewards)[:top_k]
 
         if include_race_data:
             # Try with filter first, fallback to no filter if no results
             race_data = self.vector_store.search(
-                query, VectorStore.RACE_DATA_COLLECTION, top_k, race_filter
+                expanded_query, VectorStore.RACE_DATA_COLLECTION, top_k, race_filter
             )
             # If no results with filter, try without filter
             if not race_data and race_filter:
                 race_data = self.vector_store.search(
-                    query, VectorStore.RACE_DATA_COLLECTION, top_k
+                    expanded_query, VectorStore.RACE_DATA_COLLECTION, top_k
                 )
+            # Apply keyword boosting and deduplication
+            race_data = self.boost_keyword_matches(race_data, query)
+            race_data = self.deduplicate_results(race_data)[:top_k]
 
         return RetrievalContext(
             regulations=regulations,
