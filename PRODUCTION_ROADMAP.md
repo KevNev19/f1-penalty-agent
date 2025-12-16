@@ -1,0 +1,178 @@
+# Production Roadmap
+
+This document outlines the current state of the F1 Penalty Agent POC and the improvements required for production readiness.
+
+## Current POC Status
+
+### Retrieval Accuracy Metrics
+
+| Collection | Average Score | Max Score | Min Score |
+|------------|--------------|-----------|-----------|
+| **Regulations** | 0.64 | 0.76 | 0.53 |
+| **Stewards Decisions** | 0.58 | 0.65 | 0.51 |
+| **Race Data** | 0.59 | 0.66 | 0.53 |
+| **Overall** | **0.60** | 0.76 | 0.51 |
+
+### POC Features Implemented ✅
+
+| Feature | Description | Impact |
+|---------|-------------|--------|
+| Query Expansion | F1-specific synonym expansion (18 terms) | +3-5% |
+| Keyword Boosting | +2% score boost per keyword match (max 10%) | +2-3% |
+| Score Threshold | Filter results below 0.5 similarity | Removes noise |
+| Content Deduplication | Hash-based duplicate removal | Cleaner results |
+| Context-Aware Retrieval | Season/race metadata filtering | Better relevance |
+
+---
+
+## Production Improvements Required
+
+### Priority 1: Quick Wins (Low Effort, Medium Impact)
+
+#### 1.1 Upgrade Embedding Model
+**Current:** `models/text-embedding-004` (Gemini)  
+**Recommended:** `text-embedding-3-large` (OpenAI) or fine-tuned model
+
+| Metric | Current | Expected |
+|--------|---------|----------|
+| Accuracy | 0.60 avg | 0.65-0.70 avg |
+| Cost | ~$0.001/1K tokens | ~$0.005/1K tokens |
+| Effort | Config change | 1 hour |
+
+#### 1.2 Increase Chunk Overlap
+**Current:** 200 character overlap  
+**Recommended:** 400 character overlap
+
+Improves context preservation at chunk boundaries.
+
+---
+
+### Priority 2: Cross-Encoder Re-Ranking (Medium Effort, High Impact)
+
+**What:** Add a second-stage re-ranker using a cross-encoder model after initial retrieval.
+
+**Implementation:**
+```python
+# Example using sentence-transformers
+from sentence_transformers import CrossEncoder
+reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+# Retrieve top 20 with embeddings, re-rank to top 5
+initial_results = vector_store.search(query, top_k=20)
+pairs = [(query, r.document.content) for r in initial_results]
+scores = reranker.predict(pairs)
+reranked = sorted(zip(initial_results, scores), key=lambda x: x[1], reverse=True)[:5]
+```
+
+| Metric | Impact |
+|--------|--------|
+| Accuracy | +10-15% improvement |
+| Latency | +200-500ms per query |
+| Memory | +500MB for model |
+| Effort | 4-8 hours implementation |
+
+**Dependencies:**
+- `sentence-transformers` package
+- Model download (~100MB)
+
+---
+
+### Priority 3: Fine-Tuned Embeddings (High Effort, High Impact)
+
+**What:** Train a custom embedding model on F1-specific query-document pairs.
+
+**Requirements:**
+1. **Training Data:** 5,000-10,000 labeled pairs
+   - Query: "What is a 5 second penalty?"
+   - Positive Doc: Regulation article about time penalties
+   - Negative Docs: Unrelated regulation sections
+
+2. **Infrastructure:**
+   - GPU compute for training (A100 recommended)
+   - Model hosting infrastructure
+   - Versioning and deployment pipeline
+
+3. **Maintenance:**
+   - Retrain when new regulations are published
+   - A/B testing framework for model comparison
+
+| Metric | Impact |
+|--------|--------|
+| Accuracy | +15-25% improvement |
+| Cost | $500-2000 training compute |
+| Effort | 2-4 weeks |
+
+---
+
+### Priority 4: Additional Production Features
+
+#### 4.1 Caching Layer
+- Redis/Memcached for frequently asked questions
+- Reduces API costs and latency
+- Estimated: 60-70% cache hit rate for common queries
+
+#### 4.2 Monitoring & Observability
+- Query latency metrics
+- Retrieval score distributions
+- User feedback collection (thumbs up/down)
+- Error rate tracking
+
+#### 4.3 Rate Limiting & Quotas
+- Per-user rate limits
+- API key management
+- Cost controls for embedding API
+
+#### 4.4 Multi-Season Support
+- Historical regulations archive
+- Season-specific routing
+- Regulation change tracking
+
+---
+
+## Production Architecture Recommendation
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   API Gateway   │───▶│   F1 Agent      │───▶│   ChromaDB      │
+│   (Rate Limit)  │    │   Service       │    │   (Vector DB)   │
+└─────────────────┘    └────────┬────────┘    └─────────────────┘
+                                │
+                    ┌───────────┼───────────┐
+                    ▼           ▼           ▼
+              ┌─────────┐ ┌─────────┐ ┌─────────┐
+              │ Gemini  │ │ Redis   │ │ Re-rank │
+              │ LLM API │ │ Cache   │ │ Model   │
+              └─────────┘ └─────────┘ └─────────┘
+```
+
+---
+
+## Accuracy Target Summary
+
+| Stage | Average Score | Gap to 0.9 |
+|-------|---------------|------------|
+| **Current POC** | 0.60 | 0.30 (30%) |
+| + Embedding Upgrade | 0.67 | 0.23 (23%) |
+| + Cross-Encoder | 0.77 | 0.13 (13%) |
+| + Fine-Tuned Embeddings | 0.90+ | 0% ✅ |
+
+---
+
+## Recommendation for Next Phase
+
+For a **production MVP**, we recommend:
+
+1. ✅ Keep current POC implementation
+2. 🎯 Add cross-encoder re-ranking (best effort-to-value ratio)
+3. 🎯 Add caching layer for cost optimization
+4. 🎯 Add basic monitoring
+
+**Timeline:** 2-3 weeks for production MVP
+
+For **enterprise production** with 0.9+ accuracy:
+- All of the above, plus fine-tuned embeddings
+- **Timeline:** 2-3 months
+
+---
+
+*Last Updated: December 2024*
