@@ -22,6 +22,88 @@ This document outlines the current state of the F1 Penalty Agent POC and the imp
 | Score Threshold | Filter results below 0.5 similarity | Removes noise |
 | Content Deduplication | Hash-based duplicate removal | Cleaner results |
 | Context-Aware Retrieval | Season/race metadata filtering | Better relevance |
+| **Streamlit Chat UI** | Web-based chat interface with F1 theming | User-facing |
+
+---
+
+## Frontend Implementation
+
+### Current POC: Streamlit Chat Interface ✅
+
+**File:** `app.py`  
+**Run:** `streamlit run app.py`
+
+| Feature | Status |
+|---------|--------|
+| Chat interface | ✅ Implemented |
+| Session state (conversation history) | ✅ Implemented |
+| F1-themed styling (red/dark theme) | ✅ Implemented |
+| Source citations display | ✅ Implemented |
+| Example questions sidebar | ✅ Implemented |
+| ChromaDB connection status | ✅ Implemented |
+| Streaming responses | ⏸️ Deferred (see below) |
+
+### Production Frontend Improvements
+
+#### 5.1 Streaming Responses (Medium Effort)
+**Current:** Wait for full response before displaying  
+**Production:** Token-by-token streaming like ChatGPT
+
+```python
+# Streamlit streaming implementation
+def stream_response(prompt):
+    response_placeholder = st.empty()
+    full_response = ""
+    
+    for chunk in agent.ask_stream(prompt):
+        full_response += chunk
+        response_placeholder.markdown(full_response + "▌")
+    
+    response_placeholder.markdown(full_response)
+```
+
+| Metric | Impact |
+|--------|--------|
+| UX | Significant improvement - feels responsive |
+| Effort | 2-4 hours |
+
+#### 5.2 FastAPI + React (High Effort, Production-Ready)
+
+**Architecture:**
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   React     │────▶│   FastAPI   │────▶│  F1 Agent   │
+│   Frontend  │◀────│   Backend   │◀────│  + ChromaDB │
+└─────────────┘     └─────────────┘     └─────────────┘
+     (Vercel)          (Cloud Run)         (GKE/k3d)
+```
+
+**Benefits over Streamlit:**
+- Better scalability (stateless backend)
+- Custom UI/UX (full control)
+- Mobile-responsive design
+- WebSocket for real-time streaming
+- Authentication integration
+
+| Metric | Details |
+|--------|---------|
+| Effort | 1-2 weeks |
+| Frontend | React + TailwindCSS |
+| Backend | FastAPI + Pydantic |
+| Deployment | Vercel (FE) + Cloud Run (BE) |
+
+#### 5.3 Mobile App (Future)
+
+**Options:**
+1. **React Native** - Share code with web frontend
+2. **Flutter** - Cross-platform with native performance
+3. **PWA** - Progressive Web App from React frontend
+
+| Option | Effort | Best For |
+|--------|--------|----------|
+| PWA | 1-2 days | Quick mobile support |
+| React Native | 2-3 weeks | iOS + Android apps |
+| Flutter | 3-4 weeks | Native performance |
 
 ---
 

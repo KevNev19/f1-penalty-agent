@@ -34,6 +34,7 @@ dependencies = [
     
     # Optional web UI
     "gradio>=4.0.0",
+    "streamlit (>=1.52.1,<2.0.0)",
 ]
 
 [project.optional-dependencies]
