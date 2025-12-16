@@ -304,7 +304,7 @@ class VectorStore:
             query_embedding = ef.embed_query(text=query)
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=top_k,
+                n_results=top_k * 2,  # Get extra for deduplication
                 where=filter_metadata,
                 include=["documents", "metadatas", "distances"],
             )
@@ -312,19 +312,31 @@ class VectorStore:
             # PersistentClient - ChromaDB handles query embedding
             results = collection.query(
                 query_texts=[query],
-                n_results=top_k,
+                n_results=top_k * 2,  # Get extra for deduplication
                 where=filter_metadata,
                 include=["documents", "metadatas", "distances"],
             )
 
-        # Convert to SearchResult objects
+        # Convert to SearchResult objects with deduplication
         search_results = []
+        seen_content = set()  # Track content hashes for deduplication
+        
         if results["documents"] and results["documents"][0]:
             for i, doc_content in enumerate(results["documents"][0]):
                 metadata = results["metadatas"][0][i] if results["metadatas"] else {}
                 # ChromaDB returns distances, convert to similarity score
                 distance = results["distances"][0][i] if results["distances"] else 0
                 score = 1 - distance  # Cosine distance to similarity
+                
+                # Skip low-score results (threshold at 0.5)
+                if score < 0.5:
+                    continue
+                
+                # Deduplication: skip if we've seen very similar content
+                content_hash = hash(doc_content[:500])  # Hash first 500 chars
+                if content_hash in seen_content:
+                    continue
+                seen_content.add(content_hash)
 
                 search_results.append(
                     SearchResult(
@@ -336,6 +348,10 @@ class VectorStore:
                         score=score,
                     )
                 )
+                
+                # Stop once we have enough unique results
+                if len(search_results) >= top_k:
+                    break
 
         return search_results
 
