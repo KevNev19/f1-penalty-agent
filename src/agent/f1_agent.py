@@ -151,7 +151,7 @@ class F1Agent:
         for result in context.regulations[:3]:
             source = result.document.metadata.get("source", "FIA Regulations")
             if source not in sources:
-                sources.append(f"📜 {source}")
+                sources.append(f"[Source] {source}")
 
         for result in context.stewards_decisions[:3]:
             event = result.document.metadata.get("event", "Unknown")

@@ -216,7 +216,12 @@ def status():
 
     settings.ensure_directories()
 
-    vector_store = VectorStore(settings.chroma_persist_dir, settings.google_api_key)
+    vector_store = VectorStore(
+        settings.chroma_persist_dir,
+        settings.google_api_key,
+        chroma_host=settings.chroma_host,
+        chroma_port=settings.chroma_port,
+    )
 
     console.print("[bold]F1 Penalty Agent Status[/]\n")
 

@@ -384,14 +384,18 @@ class VectorStore:
             Dict with collection statistics.
         """
         try:
-            collection = self._get_collection(collection_name)
-            return {
-                "name": collection_name,
-                "count": collection.count(),
-            }
-        except ValueError:
-            # Collection doesn't exist
-            return {"name": collection_name, "count": 0}
+            # Use client.get_collection directly to avoid _get_collection
+            # which may trigger hnswlib issues with get_or_create_collection
+            client = self._get_client()
+            try:
+                collection = client.get_collection(name=collection_name)
+                return {
+                    "name": collection_name,
+                    "count": collection.count(),
+                }
+            except Exception:
+                # Collection doesn't exist
+                return {"name": collection_name, "count": 0}
         except Exception as e:
             logger.warning(f"Failed to get stats for collection {collection_name}: {e}")
             return {"name": collection_name, "count": 0, "error": str(e)}
