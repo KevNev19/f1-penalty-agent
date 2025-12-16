@@ -81,7 +81,12 @@ class F1Retriever:
         "penalty": ["sanction", "punishment", "time penalty", "grid penalty", "reprimand"],
         "5 second": ["five second", "5s", "five-second"],
         "10 second": ["ten second", "10s", "ten-second"],
-        "track limits": ["track boundaries", "running wide", "exceeding track limits", "leaving the track"],
+        "track limits": [
+            "track boundaries",
+            "running wide",
+            "exceeding track limits",
+            "leaving the track",
+        ],
         "impeding": ["blocking", "held up", "obstructing", "getting in the way"],
         "unsafe release": ["dangerous release", "pit release", "pit lane incident"],
         "collision": ["crash", "contact", "incident", "accident", "hit"],
@@ -128,9 +133,7 @@ class F1Retriever:
             return f"{query} {' '.join(expansions)}"
         return query
 
-    def boost_keyword_matches(
-        self, results: list[SearchResult], query: str
-    ) -> list[SearchResult]:
+    def boost_keyword_matches(self, results: list[SearchResult], query: str) -> list[SearchResult]:
         """Boost scores for results that contain exact keyword matches.
 
         Args:
@@ -155,9 +158,7 @@ class F1Retriever:
         results.sort(key=lambda x: x.score, reverse=True)
         return results
 
-    def deduplicate_results(
-        self, results: list[SearchResult]
-    ) -> list[SearchResult]:
+    def deduplicate_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Remove duplicate results based on source and content similarity.
 
         Args:

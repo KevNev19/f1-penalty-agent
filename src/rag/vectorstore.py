@@ -320,18 +320,18 @@ class VectorStore:
         # Convert to SearchResult objects with deduplication
         search_results = []
         seen_content = set()  # Track content hashes for deduplication
-        
+
         if results["documents"] and results["documents"][0]:
             for i, doc_content in enumerate(results["documents"][0]):
                 metadata = results["metadatas"][0][i] if results["metadatas"] else {}
                 # ChromaDB returns distances, convert to similarity score
                 distance = results["distances"][0][i] if results["distances"] else 0
                 score = 1 - distance  # Cosine distance to similarity
-                
+
                 # Skip low-score results (threshold at 0.5)
                 if score < 0.5:
                     continue
-                
+
                 # Deduplication: skip if we've seen very similar content
                 content_hash = hash(doc_content[:500])  # Hash first 500 chars
                 if content_hash in seen_content:
@@ -348,7 +348,7 @@ class VectorStore:
                         score=score,
                     )
                 )
-                
+
                 # Stop once we have enough unique results
                 if len(search_results) >= top_k:
                     break

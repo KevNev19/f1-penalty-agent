@@ -84,6 +84,18 @@ poetry run python -m src.interface.cli chat
 poetry run python -m src.interface.cli status
 ```
 
+### Web UI (Streamlit)
+
+```bash
+# Start the web interface
+$env:CHROMA_HOST="localhost"  # PowerShell
+# export CHROMA_HOST=localhost  # Bash
+
+streamlit run app.py
+```
+
+Visit **http://localhost:8501** for the chat interface.
+
 ## Environment Variables
 
 Instead of CLI flags, you can set these in `.env`:
