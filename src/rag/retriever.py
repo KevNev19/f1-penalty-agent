@@ -233,6 +233,7 @@ Message: {event.message}
         include_regulations: bool = True,
         include_stewards: bool = True,
         include_race_data: bool = True,
+        query_context: dict | None = None,
     ) -> RetrievalContext:
         """Retrieve relevant context for a query.
 
@@ -242,6 +243,8 @@ Message: {event.message}
             include_regulations: Whether to search regulations.
             include_stewards: Whether to search stewards decisions.
             include_race_data: Whether to search race control data.
+            query_context: Optional dict with detected driver/race/season context
+                          for filtering stewards_decisions and race_data.
 
         Returns:
             RetrievalContext with relevant documents.
@@ -250,14 +253,47 @@ Message: {event.message}
         stewards = []
         race_data = []
 
+        # Build metadata filters from query context
+        # Note: ChromaDB supports $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin
+        # For text matching in content, we rely on the embedding search instead
+        stewards_filter = None
+        race_filter = None
+
+        if query_context:
+            # For stewards_decisions, we don't have reliable metadata fields to filter
+            # The embedding search will handle relevance based on query terms
+
+            # For race_data, filter by season if available (integer comparison)
+            if query_context.get("season"):
+                race_filter = {"season": {"$eq": query_context["season"]}}
+
         if include_regulations:
-            regulations = self.vector_store.search(query, VectorStore.REGULATIONS_COLLECTION, top_k)
+            # Regulations don't use context filters (search all)
+            regulations = self.vector_store.search(
+                query, VectorStore.REGULATIONS_COLLECTION, top_k
+            )
 
         if include_stewards:
-            stewards = self.vector_store.search(query, VectorStore.STEWARDS_COLLECTION, top_k)
+            # Try with filter first, fallback to no filter if no results
+            stewards = self.vector_store.search(
+                query, VectorStore.STEWARDS_COLLECTION, top_k, stewards_filter
+            )
+            # If no results with filter, try without filter
+            if not stewards and stewards_filter:
+                stewards = self.vector_store.search(
+                    query, VectorStore.STEWARDS_COLLECTION, top_k
+                )
 
         if include_race_data:
-            race_data = self.vector_store.search(query, VectorStore.RACE_DATA_COLLECTION, top_k)
+            # Try with filter first, fallback to no filter if no results
+            race_data = self.vector_store.search(
+                query, VectorStore.RACE_DATA_COLLECTION, top_k, race_filter
+            )
+            # If no results with filter, try without filter
+            if not race_data and race_filter:
+                race_data = self.vector_store.search(
+                    query, VectorStore.RACE_DATA_COLLECTION, top_k
+                )
 
         return RetrievalContext(
             regulations=regulations,

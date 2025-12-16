@@ -156,14 +156,14 @@ class F1Agent:
         for result in context.stewards_decisions[:3]:
             event = result.document.metadata.get("event", "Unknown")
             source = result.document.metadata.get("source", "Stewards Decision")
-            desc = f"⚖️ {source} ({event})"
+            desc = f"[Stewards] {source} ({event})"
             if desc not in sources:
                 sources.append(desc)
 
         for result in context.race_data[:3]:
             race = result.document.metadata.get("race", "Race")
             season = result.document.metadata.get("season", "")
-            desc = f"🏎️ Race Control: {race} {season}"
+            desc = f"[Race Control] {race} {season}"
             if desc not in sources:
                 sources.append(desc)
 
@@ -197,7 +197,7 @@ class F1Agent:
 
         # Retrieve relevant documents
         console.print("[dim]Searching knowledge base...[/]")
-        context = self.retriever.retrieve(query, top_k=5)
+        context = self.retriever.retrieve(query, top_k=5, query_context=query_context)
 
         # Build prompt
         prompt = self.build_prompt(query, query_type, context)
@@ -235,7 +235,8 @@ class F1Agent:
             raise ValueError("Query cannot be empty or whitespace only")
 
         query_type = self.classify_query(query)
-        context = self.retriever.retrieve(query, top_k=5)
+        query_context = self.retriever.extract_race_context(query)
+        context = self.retriever.retrieve(query, top_k=5, query_context=query_context)
         prompt = self.build_prompt(query, query_type, context)
 
         full_response = ""
