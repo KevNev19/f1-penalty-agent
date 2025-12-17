@@ -32,25 +32,24 @@ class SearchResult:
 
 
 class GeminiEmbeddingFunction:
-    """Embedding function using Google Gemini API."""
+    """Embedding function using Google Gemini API (google-genai SDK)."""
 
     def __init__(self, api_key: str):
         """Initialize with API key."""
         self.api_key = api_key
-        self._model = None
+        self._client = None
 
     def name(self) -> str:
         """Return the embedding function name (required by ChromaDB)."""
         return "gemini-text-embedding-004"
 
-    def _get_model(self):
-        """Lazy load the embedding model."""
-        if self._model is None:
-            import google.generativeai as genai
+    def _get_client(self):
+        """Lazy load the Gemini client."""
+        if self._client is None:
+            from google import genai
 
-            genai.configure(api_key=self.api_key)
-            self._model = genai
-        return self._model
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def __call__(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for the input texts (for documents).
@@ -60,7 +59,7 @@ class GeminiEmbeddingFunction:
         Args:
             texts: List of document texts to embed.
         """
-        return self._embed_texts(texts, task_type="retrieval_document")
+        return self._embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
 
     def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text.
@@ -70,14 +69,16 @@ class GeminiEmbeddingFunction:
         Args:
             text: The query text to embed.
         """
-        embeddings = self._embed_texts([text], task_type="retrieval_query")
+        embeddings = self._embed_texts([text], task_type="RETRIEVAL_QUERY")
         return embeddings[0] if embeddings else [0.0] * 768
 
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
         """Generate embeddings for texts with specified task type."""
         import time
 
-        model = self._get_model()
+        from google.genai.types import EmbedContentConfig
+
+        client = self._get_client()
         embeddings = []
 
         # Process in batches to avoid rate limits
@@ -89,12 +90,13 @@ class GeminiEmbeddingFunction:
             for text in batch:
                 for attempt in range(max_retries):
                     try:
-                        result = model.embed_content(
-                            model="models/text-embedding-004",
-                            content=text,
-                            task_type=task_type,
+                        result = client.models.embed_content(
+                            model="text-embedding-004",
+                            contents=text,
+                            config=EmbedContentConfig(task_type=task_type),
                         )
-                        embeddings.append(result["embedding"])
+                        # New SDK returns embedding in result.embeddings[0].values
+                        embeddings.append(list(result.embeddings[0].values))
                         break  # Success, move to next text
                     except Exception as e:
                         error_msg = str(e).lower()

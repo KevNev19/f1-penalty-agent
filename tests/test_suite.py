@@ -356,7 +356,7 @@ class TestGeminiClient:
         client = GeminiClient(api_key, "gemini-2.0-flash")
         assert client.api_key == api_key
         assert client.model_name == "gemini-2.0-flash"
-        assert client._model is None  # Lazy loading
+        assert client._client is None  # Lazy loading
 
     @pytest.mark.unit
     def test_client_no_api_key_error(self):
@@ -365,7 +365,7 @@ class TestGeminiClient:
 
         client = GeminiClient("", "gemini-2.0-flash")
         with pytest.raises(ValueError, match="API key"):
-            client._get_model()
+            client._get_client()
 
 
 # ============================================================================

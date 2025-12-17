@@ -1,4 +1,4 @@
-"""Google Gemini API client for LLM inference."""
+"""Google Gemini API client for LLM inference using the google-genai SDK."""
 
 from collections.abc import Generator
 
@@ -8,7 +8,7 @@ console = Console()
 
 
 class GeminiClient:
-    """Client for Google Gemini API."""
+    """Client for Google Gemini API using the new google-genai SDK."""
 
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash") -> None:
         """Initialize the Gemini client.
@@ -19,24 +19,23 @@ class GeminiClient:
         """
         self.api_key = api_key
         self.model_name = model
-        self._model = None
+        self._client = None
 
-    def _get_model(self):
-        """Lazy load the Gemini model."""
-        if self._model is None:
+    def _get_client(self):
+        """Lazy load the Gemini client."""
+        if self._client is None:
             if not self.api_key:
                 raise ValueError(
                     "Google API key not set. Get one at https://aistudio.google.com/ "
                     "and set GOOGLE_API_KEY in your .env file."
                 )
 
-            import google.generativeai as genai
+            from google import genai
 
-            genai.configure(api_key=self.api_key)
-            self._model = genai.GenerativeModel(self.model_name)
-            console.print(f"[green]Gemini model initialized: {self.model_name}[/]")
+            self._client = genai.Client(api_key=self.api_key)
+            console.print(f"[green]Gemini client initialized for model: {self.model_name}[/]")
 
-        return self._model
+        return self._client
 
     def generate(
         self,
@@ -60,7 +59,9 @@ class GeminiClient:
         """
         import time
 
-        model = self._get_model()
+        from google.genai.types import GenerateContentConfig
+
+        client = self._get_client()
 
         # Combine system and user prompts
         if system_prompt:
@@ -70,16 +71,17 @@ class GeminiClient:
 
         for attempt in range(max_retries):
             try:
-                response = model.generate_content(
-                    full_prompt,
-                    generation_config={
-                        "temperature": temperature,
-                        "max_output_tokens": max_tokens,
-                    },
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=full_prompt,
+                    config=GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                    ),
                 )
 
-                # Handle safety filters
-                if response.prompt_feedback.block_reason:
+                # Handle safety filters (check candidates)
+                if not response.candidates:
                     return "I apologize, but I cannot provide a response to that query."
 
                 return response.text
@@ -118,7 +120,9 @@ class GeminiClient:
         Yields:
             Text chunks as they're generated.
         """
-        model = self._get_model()
+        from google.genai.types import GenerateContentConfig
+
+        client = self._get_client()
 
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n---\n\nUser Question: {prompt}"
@@ -126,13 +130,12 @@ class GeminiClient:
             full_prompt = prompt
 
         try:
-            response = model.generate_content(
-                full_prompt,
-                generation_config={"temperature": temperature},
-                stream=True,
-            )
-
-            for chunk in response:
+            # Use generate_content_stream for streaming
+            for chunk in client.models.generate_content_stream(
+                model=self.model_name,
+                contents=full_prompt,
+                config=GenerateContentConfig(temperature=temperature),
+            ):
                 if chunk.text:
                     yield chunk.text
 
@@ -152,9 +155,12 @@ class GeminiClient:
         Returns:
             Approximate token count.
         """
-        model = self._get_model()
+        client = self._get_client()
         try:
-            response = model.count_tokens(text)
+            response = client.models.count_tokens(
+                model=self.model_name,
+                contents=text,
+            )
             return response.total_tokens
         except Exception:
             # Fallback: rough estimate

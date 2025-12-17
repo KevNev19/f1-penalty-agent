@@ -22,11 +22,8 @@ dependencies = [
     "langchain>=1.2.0",
     "langchain-community>=0.4.0",
 
-    # LLM
-    # NOTE: google-generativeai reached EOL on Nov 30, 2025
-    # TODO: Migrate to google-genai package (requires code changes)
-    # See: https://ai.google.dev/gemini-api/docs/libraries
-    "google-generativeai>=0.8.5",
+    # LLM - Using new google-genai SDK (google-generativeai reached EOL Nov 30, 2025)
+    "google-genai>=1.0.0",
 
     # Utilities
     "python-dotenv>=1.2.0",
