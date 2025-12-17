@@ -306,7 +306,7 @@ class VectorStore:
                 query_embeddings=[query_embedding],
                 n_results=top_k * 2,  # Get extra for deduplication
                 where=filter_metadata,
-                include=["documents", "metadatas", "distances"],
+                include=["ids", "documents", "metadatas", "distances"],
             )
         else:
             # PersistentClient - ChromaDB handles query embedding
@@ -314,7 +314,7 @@ class VectorStore:
                 query_texts=[query],
                 n_results=top_k * 2,  # Get extra for deduplication
                 where=filter_metadata,
-                include=["documents", "metadatas", "distances"],
+                include=["ids", "documents", "metadatas", "distances"],
             )
 
         # Convert to SearchResult objects with deduplication

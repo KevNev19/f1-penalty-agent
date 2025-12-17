@@ -70,6 +70,7 @@ data/cache/
 data/regulations/*.pdf
 data/stewards/*.pdf
 data/chroma/
+data/test_*/
 
 # Logs and temp files
 *.log

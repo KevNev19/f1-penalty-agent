@@ -14,8 +14,13 @@ app = typer.Typer(
 console = Console()
 
 
-def get_agent():
-    """Get or create the F1 agent instance."""
+def get_agent(chroma_host: str | None = None, chroma_port: int | None = None):
+    """Get or create the F1 agent instance.
+
+    Args:
+        chroma_host: Optional ChromaDB server host (overrides env var).
+        chroma_port: Optional ChromaDB server port (overrides env var).
+    """
     from ..agent.f1_agent import F1Agent
     from ..config import settings
     from ..llm.gemini_client import GeminiClient
@@ -31,12 +36,16 @@ def get_agent():
         )
         raise typer.Exit(1)
 
+    # Use CLI args if provided, otherwise fall back to config/env vars
+    host = chroma_host if chroma_host is not None else settings.chroma_host
+    port = chroma_port if chroma_port is not None else settings.chroma_port
+
     # Use ChromaDB settings from config (supports K8s mode via CHROMA_HOST env var)
     vector_store = VectorStore(
         settings.chroma_persist_dir,
         settings.google_api_key,
-        chroma_host=settings.chroma_host,
-        chroma_port=settings.chroma_port,
+        chroma_host=host,
+        chroma_port=port,
     )
     retriever = F1Retriever(vector_store)
     llm = GeminiClient(settings.google_api_key, settings.llm_model)
@@ -45,7 +54,19 @@ def get_agent():
 
 
 @app.command()
-def chat():
+def chat(
+    chroma_host: str | None = typer.Option(
+        None,
+        "--chroma-host",
+        help="ChromaDB server host (for K8s mode). Overrides CHROMA_HOST env var.",
+    ),
+    chroma_port: int | None = typer.Option(
+        None,
+        "--chroma-port",
+        "-p",
+        help="ChromaDB server port. Overrides CHROMA_PORT env var.",
+    ),
+):
     """Start an interactive chat session with the F1 agent."""
     console.print(
         Panel.fit(
@@ -62,7 +83,7 @@ def chat():
     )
 
     try:
-        agent = get_agent()
+        agent = get_agent(chroma_host=chroma_host, chroma_port=chroma_port)
     except Exception as e:
         console.print(f"[red]Failed to initialize agent: {e}[/]")
         raise typer.Exit(1)
@@ -107,10 +128,21 @@ def chat():
 @app.command()
 def ask(
     question: str = typer.Argument(..., help="Question about F1 penalties or rules"),
+    chroma_host: str | None = typer.Option(
+        None,
+        "--chroma-host",
+        help="ChromaDB server host (for K8s mode). Overrides CHROMA_HOST env var.",
+    ),
+    chroma_port: int | None = typer.Option(
+        None,
+        "--chroma-port",
+        "-p",
+        help="ChromaDB server port. Overrides CHROMA_PORT env var.",
+    ),
 ):
     """Ask a single question and get an answer."""
     try:
-        agent = get_agent()
+        agent = get_agent(chroma_host=chroma_host, chroma_port=chroma_port)
     except Exception as e:
         console.print(f"[red]Failed to initialize agent: {e}[/]")
         raise typer.Exit(1)
