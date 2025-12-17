@@ -85,8 +85,11 @@ jobs:
       - name: Start ChromaDB
         run: |
           docker run -d -p 8000:8000 --name chromadb chromadb/chroma:latest
-          sleep 10
-          curl -f http://localhost:8000/api/v2/heartbeat || exit 1
+          sleep 15
+          # Try v2 heartbeat first, then v1, then root endpoint
+          curl -f http://localhost:8000/api/v2/heartbeat || \
+          curl -f http://localhost:8000/api/v1/heartbeat || \
+          curl -f http://localhost:8000/ || exit 1
       
       - name: Run integration tests
         run: poetry run pytest tests/ -m integration -v --tb=short
