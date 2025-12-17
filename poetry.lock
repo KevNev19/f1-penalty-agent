@@ -7792,9 +7792,9 @@ files = [
 cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and python_version < \"3.14\"", "cffi (>=2.0.0b) ; platform_python_implementation != \"PyPy\" and python_version >= \"3.14\""]
 
 [extras]
-dev = ["mypy", "pytest", "pytest-asyncio", "ruff"]
+dev = ["mypy", "pytest", "pytest-asyncio", "pyyaml", "ruff"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.13"
-content-hash = "7f419979400712c30d987e78e31fdac23ea10a53740ca59d058c25e5edca6c9c"
+content-hash = "1ad0fadb2909b69c3488f26f0e524b81c67a5609422e584c2d7ac0351a2168f3"
