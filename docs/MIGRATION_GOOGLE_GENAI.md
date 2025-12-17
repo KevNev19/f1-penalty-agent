@@ -1,5 +1,9 @@
 # Migration Plan: google-generativeai → google-genai
 
+> **Status: ✅ COMPLETED** (December 17, 2025)
+>
+> This migration has been implemented. See commits on branch `claude/migrate-google-genai-EYpex`.
+
 ## Overview
 
 The `google-generativeai` package reached End-of-Life on **November 30, 2025**. This document outlines the migration plan to the new `google-genai` SDK.
