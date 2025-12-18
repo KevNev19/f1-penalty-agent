@@ -13,6 +13,23 @@ An AI-powered agent that explains Formula 1 penalties and regulations to fans us
 - ☸️ **Kubernetes Ready** - Optional deployment to Docker Desktop Kubernetes
 - 🔄 **Retry Logic** - Exponential backoff for API rate limits
 
+## Production Roadmap 🚀
+
+We are actively working on moving this POC to production. See [PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md) for full details.
+
+### Key Work Items
+
+| Area | Issue | Priority |
+|------|-------|----------|
+| **Accuracy** | [Upgrade Embedding Model](https://github.com/KevNev19/f1-penalty-agent/issues/20) | High |
+| **Accuracy** | [Cross-Encoder Re-Ranking](https://github.com/KevNev19/f1-penalty-agent/issues/21) | High |
+| **Accuracy** | [Improve Chunking](https://github.com/KevNev19/f1-penalty-agent/issues/26) | Medium |
+| **Data** | [Fix Stewards Decisions 2025](https://github.com/KevNev19/f1-penalty-agent/issues/17) | Critical |
+| **Data** | [Multi-Season Support](https://github.com/KevNev19/f1-penalty-agent/issues/25) | Medium |
+| **Performance** | [Implement Caching](https://github.com/KevNev19/f1-penalty-agent/issues/22) | High |
+| **Performance** | [Streaming Responses](https://github.com/KevNev19/f1-penalty-agent/issues/18) | Medium |
+| **Architecture** | [Migrate to FastAPI + React](https://github.com/KevNev19/f1-penalty-agent/issues/19) | Long Term |
+
 ## Demo
 
 ![F1 Penalty Agent Demo](docs/assets/demo.webp)
