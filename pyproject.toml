@@ -44,6 +44,7 @@ dev = [
     "ruff>=0.14.0",
     "mypy>=1.19.0",
     "pyyaml>=6.0.0",
+    "testcontainers[chroma]>=4.0.0",
 ]
 
 [project.scripts]
