@@ -155,18 +155,37 @@ def chromadb_container():
     Automatically starts and stops a ChromaDB Docker container.
     Requires Docker to be running on the host machine.
     """
-    try:
-        from testcontainers.chroma import ChromaContainer
-    except ImportError:
-        pytest.skip(
-            "testcontainers[chroma] not installed - run: pip install testcontainers[chroma]"
-        )
+    import time
 
-    with ChromaContainer() as chroma:
-        yield {
-            "host": chroma.get_container_host_ip(),
-            "port": int(chroma.get_exposed_port(8000)),
-        }
+    import httpx
+
+    try:
+        from testcontainers.core.container import DockerContainer
+    except ImportError:
+        pytest.skip("testcontainers not installed - run: pip install testcontainers")
+
+    # Use generic DockerContainer to avoid chromadb-client dependency conflict
+    container = DockerContainer("chromadb/chroma:latest")
+    container.with_exposed_ports(8000)
+
+    with container:
+        host = container.get_container_host_ip()
+        port = int(container.get_exposed_port(8000))
+        url = f"http://{host}:{port}/api/v2/heartbeat"
+
+        # Wait for ChromaDB to be ready via HTTP health check
+        for attempt in range(30):  # 30 attempts * 2 seconds = 60 second timeout
+            try:
+                response = httpx.get(url, timeout=2.0)
+                if response.status_code == 200:
+                    break
+            except httpx.RequestError:
+                pass
+            time.sleep(2)
+        else:
+            pytest.fail("ChromaDB container did not become ready in time")
+
+        yield {"host": host, "port": port}
 
 
 @pytest.fixture(scope="session")

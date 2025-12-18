@@ -154,7 +154,7 @@ class VectorStore:
         """Get or create ChromaDB client.
 
         Uses HttpClient if chroma_host is set (k3d/Docker mode),
-        otherwise uses PersistentClient (local mode with SegmentAPI workaround).
+        otherwise uses PersistentClient (local mode).
         """
         if self._client is None:
             import chromadb
@@ -171,14 +171,10 @@ class VectorStore:
                 )
             else:
                 # Use PersistentClient for local development
-                # IMPORTANT: Use SegmentAPI to avoid Rust bindings hanging on Windows/Python 3.12
-                # See: https://github.com/chroma-core/chroma/issues/189
+                # Simple initialization - ChromaDB handles internal API selection
                 self._client = chromadb.PersistentClient(
                     path=str(self.persist_dir),
-                    settings=Settings(
-                        anonymized_telemetry=False,
-                        chroma_api_impl="chromadb.api.segment.SegmentAPI",
-                    ),
+                    settings=Settings(anonymized_telemetry=False),
                 )
                 console.print(f"[green]ChromaDB initialized at {self.persist_dir}[/]")
 

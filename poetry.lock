@@ -837,35 +837,6 @@ uvicorn = {version = ">=0.18.3", extras = ["standard"]}
 dev = ["chroma-hnswlib (==0.7.6)", "fastapi (>=0.115.9)", "opentelemetry-instrumentation-fastapi (>=0.41b0)"]
 
 [[package]]
-name = "chromadb-client"
-version = "1.3.6"
-description = "Chroma Client."
-optional = true
-python-versions = ">=3.9"
-groups = ["main"]
-markers = "extra == \"dev\""
-files = [
-    {file = "chromadb_client-1.3.6-py3-none-any.whl", hash = "sha256:e4dc9a75e9564d86e63807061f461b6caf6e4a2e1c6758aa79ec1122cad319d1"},
-    {file = "chromadb_client-1.3.6.tar.gz", hash = "sha256:915110972b5683bb7208513312323e06b66d9eb70a83022eae67192d7e9b3356"},
-]
-
-[package.dependencies]
-httpx = ">=0.27.0"
-jsonschema = ">=4.19.0"
-numpy = ">=1.22.5"
-opentelemetry-api = ">=1.2.0"
-opentelemetry-exporter-otlp-proto-grpc = ">=1.2.0"
-opentelemetry-sdk = ">=1.2.0"
-orjson = ">=3.9.12"
-overrides = ">=7.3.1"
-posthog = ">=2.4.0,<6.0.0"
-pybase64 = ">=1.4.1"
-pydantic = ">=1.9"
-PyYAML = ">=6.0.0"
-tenacity = ">=8.2.3"
-typing_extensions = ">=4.5.0"
-
-[[package]]
 name = "click"
 version = "8.3.1"
 description = "Composable command line interface toolkit"
@@ -6535,7 +6506,6 @@ files = [
 ]
 
 [package.dependencies]
-chromadb-client = {version = ">=1.0.0,<2.0.0", optional = true, markers = "extra == \"chroma\""}
 docker = "*"
 python-dotenv = "*"
 typing-extensions = "*"
@@ -7933,4 +7903,4 @@ dev = ["mypy", "pytest", "pytest-asyncio", "pyyaml", "ruff", "testcontainers"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.13"
-content-hash = "043a5796d0aa6ba679be835c94f9c7afa1e3acab1f2d81ef42f671337771b245"
+content-hash = "8ce4ef83fad50a276af82edb5c18df6db0c953c5438ce9a8bccb3aa7ac9af404"

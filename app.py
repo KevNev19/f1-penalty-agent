@@ -60,7 +60,9 @@ def init_agent():
     from src.rag.retriever import F1Retriever
     from src.rag.vectorstore import VectorStore
 
-    chroma_host = os.environ.get("CHROMA_HOST", settings.chroma_host)
+    # Use CHROMA_HOST env var only if explicitly set
+    # Default to None = PersistentClient (local embedded mode, no server needed)
+    chroma_host = os.environ.get("CHROMA_HOST") or None
 
     vector_store = VectorStore(
         settings.chroma_persist_dir,
@@ -68,6 +70,12 @@ def init_agent():
         chroma_host=chroma_host,
         chroma_port=settings.chroma_port,
     )
+
+    # Test connectivity by initializing the client
+    try:
+        vector_store._get_client()
+    except Exception as e:
+        raise ConnectionError(f"Failed to initialize ChromaDB: {e}") from e
 
     retriever = F1Retriever(vector_store)
     llm_client = GeminiClient(settings.google_api_key)
@@ -102,16 +110,27 @@ with st.sidebar:
     st.markdown("### 📊 Status")
 
     if st.session_state.get("connected", False):
-        st.success("Connected to ChromaDB")
+        vs = st.session_state.vector_store
+
+        # Determine connection mode
+        if vs.chroma_host:
+            st.success(f"Connected to ChromaDB ({vs.chroma_host}:{vs.chroma_port})")
+        else:
+            st.success("ChromaDB (Local Mode)")
 
         try:
-            vs = st.session_state.vector_store
             st.markdown("**Knowledge Base:**")
+            total_docs = 0
             for collection in ["f1_regulations", "stewards_decisions", "race_data"]:
                 s = vs.get_collection_stats(collection)
-                st.markdown(f"• {collection}: **{s['count']}** docs")
-        except Exception:
-            pass
+                count = s.get("count", 0)
+                total_docs += count
+                st.markdown(f"• {collection}: **{count}** docs")
+
+            if total_docs == 0:
+                st.warning("Knowledge base is empty. Run `f1agent setup` to populate.")
+        except Exception as e:
+            st.error(f"Error reading stats: {e}")
     else:
         st.error("Not Connected")
         if "error" in st.session_state:
