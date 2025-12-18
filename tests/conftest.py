@@ -151,14 +151,16 @@ def mock_embeddings():
 @pytest.fixture(scope="session")
 def chromadb_container():
     """Spin up ChromaDB container for integration tests.
-    
+
     Automatically starts and stops a ChromaDB Docker container.
     Requires Docker to be running on the host machine.
     """
     try:
         from testcontainers.chroma import ChromaContainer
     except ImportError:
-        pytest.skip("testcontainers[chroma] not installed - run: pip install testcontainers[chroma]")
+        pytest.skip(
+            "testcontainers[chroma] not installed - run: pip install testcontainers[chroma]"
+        )
 
     with ChromaContainer() as chroma:
         yield {
@@ -171,7 +173,7 @@ def chromadb_container():
 def chroma_client(chromadb_container):
     """Get a ChromaDB client connected to the test container."""
     import chromadb
-    
+
     return chromadb.HttpClient(
         host=chromadb_container["host"],
         port=chromadb_container["port"],
