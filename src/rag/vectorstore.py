@@ -31,35 +31,34 @@ class SearchResult:
     score: float
 
 
+from chromadb import Documents, Embeddings
+
 class GeminiEmbeddingFunction:
-    """Embedding function using Google Gemini API (google-genai SDK)."""
+    """Custom embedding function using Google Gemini API."""
 
-    def __init__(self, api_key: str):
-        """Initialize with API key."""
+    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
         self.api_key = api_key
-        self._client = None
-
-    def name(self) -> str:
-        """Return the embedding function name (required by ChromaDB)."""
-        return "gemini-text-embedding-004"
-
-    def _get_client(self):
-        """Lazy load the Gemini client."""
-        if self._client is None:
+        self.model_name = model_name
+        try:
             from google import genai
+            self.client = genai.Client(api_key=api_key)
+        except ImportError:
+            raise ImportError("Please install google-genai to use Gemini embeddings")
 
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
-
-    def __call__(self, texts: list[str]) -> list[list[float]]:
+    def __call__(self, input) -> Embeddings:
         """Generate embeddings for the input texts (for documents).
 
-        This is called by ChromaDB to generate embeddings for indexing.
-
         Args:
-            texts: List of document texts to embed.
+            input: List of document texts to embed.
         """
-        return self._embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
+        console.print(f"[dim]Generating embeddings for {len(input)} documents...[/]")
+        try:
+            return self._embed_texts(input, task_type="RETRIEVAL_DOCUMENT")
+        except Exception as e:
+            console.print(f"[red]Embedding error: {e}[/]")
+            import traceback
+            traceback.print_exc()
+            raise e
 
     def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text.
@@ -73,44 +72,63 @@ class GeminiEmbeddingFunction:
         return embeddings[0] if embeddings else [0.0] * 768
 
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
-        """Generate embeddings for texts with specified task type."""
+        """Generate embeddings using Google Gemini REST API (batchEmbedContents)."""
+        import requests
         import time
 
-        from google.genai.types import EmbedContentConfig
-
-        client = self._get_client()
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
         embeddings = []
 
-        # Process in batches to avoid rate limits
-        batch_size = 10
+        # Process in batches (API limit is usually 100 requests per batch call, likely less for payload size)
+        # Using 20 as a safe batch size to avoid payload limits
+        batch_size = 20
         max_retries = 3
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            for text in batch:
-                for attempt in range(max_retries):
-                    try:
-                        result = client.models.embed_content(
-                            model="text-embedding-004",
-                            contents=text,
-                            config=EmbedContentConfig(task_type=task_type),
-                        )
-                        # New SDK returns embedding in result.embeddings[0].values
-                        embeddings.append(list(result.embeddings[0].values))
-                        break  # Success, move to next text
-                    except Exception as e:
-                        error_msg = str(e).lower()
-                        if "rate" in error_msg or "quota" in error_msg:
-                            wait_time = 2**attempt  # Exponential backoff: 1, 2, 4 seconds
-                            console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
-                            time.sleep(wait_time)
-                        elif attempt == max_retries - 1:
-                            console.print(
-                                f"[red]Embedding error after {max_retries} attempts: {e}[/]"
-                            )
-                            embeddings.append([0.0] * 768)  # Fallback zero vector
+            batch_texts = texts[i : i + batch_size]
+            
+            # Construct request body for batchEmbedContents
+            requests_payload = []
+            for text in batch_texts:
+                requests_payload.append({
+                    "model": self.model_name,
+                    "content": {"parts": [{"text": text}]},
+                    "taskType": task_type,
+                    "title": "Document" if task_type == "RETRIEVAL_DOCUMENT" else None
+                })
+            
+            payload = {"requests": requests_payload}
+            
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(api_url, json=payload, timeout=30)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        # Extract embeddings from response
+                        if "embeddings" in data:
+                            for emb in data["embeddings"]:
+                                # Gemini API returns 'values'
+                                embeddings.append(emb.get("values", [0.0] * 768))
                         else:
-                            time.sleep(0.5)  # Brief pause before retry
+                             # Handle empty/partial response by adding zeros
+                             console.print(f"[yellow]Warning: No embeddings in response: {data}[/]")
+                             embeddings.extend([[0.0] * 768] * len(batch_texts))
+                        break
+                    elif response.status_code == 429:
+                        wait_time = 2 ** attempt
+                        console.print(f"[yellow]Rate limit hit (429), retrying in {wait_time}s...[/]")
+                        time.sleep(wait_time)
+                    else:
+                        console.print(f"[red]API Error {response.status_code}: {response.text}[/]")
+                        if attempt == max_retries - 1:
+                            embeddings.extend([[0.0] * 768] * len(batch_texts))
+                        time.sleep(1)
+                except Exception as e:
+                    console.print(f"[red]Request failed: {e}[/]")
+                    if attempt == max_retries - 1:
+                        embeddings.extend([[0.0] * 768] * len(batch_texts))
+                    time.sleep(1)
 
         return embeddings
 
@@ -149,6 +167,29 @@ class VectorStore:
         self._client = None
         self._collections: dict[str, Collection] = {}
         self._embedding_function = None
+
+    def reset(self) -> None:
+        """Reset the vector store by deleting all collections.
+        
+        This is useful for full re-indexing.
+        """
+        # Ensure client is initialized
+        client = self._get_client()
+        for name in [
+            self.REGULATIONS_COLLECTION,
+            self.STEWARDS_COLLECTION,
+            self.RACE_DATA_COLLECTION,
+        ]:
+            try:
+                client.delete_collection(name)
+                # Remove from cache
+                if name in self._collections:
+                    del self._collections[name]
+                console.print(f"  [dim]Deleted collection {name}[/]")
+            except Exception:
+                # Collection might not exist
+                pass
+        console.print("[yellow]Vector store reset complete[/]")
 
     def _get_client(self) -> Any:
         """Get or create ChromaDB client.
@@ -211,22 +252,13 @@ class VectorStore:
         if name not in self._collections:
             client = self._get_client()
 
-            # For HttpClient, we don't pass embedding_function (generate embeddings client-side)
-            # For PersistentClient, we can use the embedding function
-            if self.chroma_host:
-                # HttpClient mode - no embedding_function
-                self._collections[name] = client.get_or_create_collection(
-                    name=name,
-                    metadata={"hnsw:space": "cosine"},
-                )
-            else:
-                # PersistentClient mode - use embedding function
-                ef = self._get_embedding_function()
-                self._collections[name] = client.get_or_create_collection(
-                    name=name,
-                    metadata={"hnsw:space": "cosine"},
-                    embedding_function=ef,
-                )
+            # We generate embeddings client-side for both modes to avoid
+            # ChromaDB 1.3+ EmbeddingFunction interface issues and inconsistencies.
+            self._collections[name] = client.get_or_create_collection(
+                name=name,
+                metadata={"hnsw:space": "cosine"},
+                # No embedding_function passed - we handle it explicitly
+            )
         return self._collections[name]
 
     def add_documents(
@@ -255,23 +287,16 @@ class VectorStore:
 
         console.print(f"[blue]Indexing {len(documents)} documents...[/]")
 
-        # For HttpClient, generate embeddings client-side
-        if self.chroma_host:
-            ef = self._get_embedding_function()
-            embeddings = ef(contents)
-            collection.add(
-                documents=contents,
-                metadatas=metadatas,
-                ids=ids,
-                embeddings=embeddings,
-            )
-        else:
-            # PersistentClient - ChromaDB handles embeddings via collection's embedding_function
-            collection.add(
-                documents=contents,
-                metadatas=metadatas,
-                ids=ids,
-            )
+        # Generate embeddings explicitly
+        ef = self._get_embedding_function()
+        embeddings = ef(contents)
+        
+        collection.add(
+            documents=contents,
+            metadatas=metadatas,
+            ids=ids,
+            embeddings=embeddings,
+        )
 
         console.print(f"[green]Added {len(documents)} documents to {collection_name}[/]")
         return len(documents)
@@ -296,26 +321,17 @@ class VectorStore:
         """
         collection = self._get_collection(collection_name)
 
-        # For HttpClient, generate query embedding client-side
-        if self.chroma_host:
-            ef = self._get_embedding_function()
-            query_embedding = ef.embed_query(text=query)
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k * 2,  # Get extra for deduplication
-                where=filter_metadata,
-                # Note: ids are automatically included in ChromaDB 1.3+
-                include=["documents", "metadatas", "distances"],
-            )
-        else:
-            # PersistentClient - ChromaDB handles query embedding
-            results = collection.query(
-                query_texts=[query],
-                n_results=top_k * 2,  # Get extra for deduplication
-                where=filter_metadata,
-                # Note: ids are automatically included in ChromaDB 1.3+
-                include=["documents", "metadatas", "distances"],
-            )
+        # Generate query embedding explicitly
+        ef = self._get_embedding_function()
+        query_embedding = ef.embed_query(text=query)
+        
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k * 2,  # Get extra for deduplication
+            where=filter_metadata,
+            # Note: ids are automatically included in ChromaDB 1.3+
+            include=["documents", "metadatas", "distances"],
+        )
 
         # Convert to SearchResult objects with deduplication
         search_results = []

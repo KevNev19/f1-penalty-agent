@@ -167,6 +167,8 @@ def setup(
         help="ChromaDB server host (for K8s mode). Default: use local PersistentClient.",
     ),
     chroma_port: int = typer.Option(8000, "--chroma-port", "-p", help="ChromaDB server port."),
+    clean: bool = typer.Option(True, "--clean", "-c", help="Clean up orphaned files and reset database."),
+    limit: int = typer.Option(0, "--limit", "-l", help="Limit number of documents to process (0 for all)."),
 ):
     """Download and index F1 regulations and data."""
     from ..config import settings
@@ -174,6 +176,8 @@ def setup(
     from ..data.fia_scraper import FIAScraper
     from ..rag.retriever import F1Retriever
     from ..rag.vectorstore import VectorStore
+
+    from rich.progress import track
 
     console.print("[bold]Setting up F1 Penalty Agent data...[/]\n")
     if chroma_host:
@@ -191,25 +195,62 @@ def setup(
     retriever = F1Retriever(vector_store)
 
     # Scrape FIA documents
-    console.print("[bold blue]Step 1: Scraping FIA documents...[/]")
+    console.print("[bold blue]Step 1: Checking for documents...[/]")
     scraper = FIAScraper(settings.data_dir)
 
     try:
-        documents = scraper.get_all_documents(season=2025)
-        console.print(f"  Found {len(documents)} documents")
+        documents = scraper.get_available_documents(season=2025, limit=limit)
+        console.print(f"  Found {len(documents)} documents available")
+
+        # Cleanup orphaned files
+        if clean:
+            scraper.cleanup_orphaned_files(documents)
+
+        # Download missing files
+        console.print("\n[bold blue]Step 2: verifying downloads...[/]")
+        downloaded = 0
+        skipped = 0
+        for doc in track(documents, description="Verifying/Downloading..."):
+            if scraper.download_document(doc):
+                downloaded += 1
+            else:
+                skipped += 1
+        console.print(f"  [green]Downloaded {downloaded} new files, verified {skipped} existing[/]")
+
+        # Extract text
+        console.print("\n[bold blue]Step 3: Processing text content...[/]")
+        processed = 0
+        for doc in track(documents, description="Extracting text..."):
+            scraper.extract_text(doc)
+            if doc.text_content:
+                processed += 1
+        console.print(f"  [green]Successfully processed text from {processed} documents[/]")
+
+        # Reset DB
+        if clean:
+            console.print("\n[bold blue]Step 3.5: Resetting database...[/]")
+            vector_store.reset()
 
         # Index documents
-        console.print("\n[bold blue]Step 2: Indexing documents...[/]")
-        for doc in documents:
+        console.print("\n[bold blue]Step 4: Indexing documents...[/]")
+        indexed_count = 0
+        for i, doc in enumerate(documents):
+            fname = doc.local_path.name if doc.local_path else doc.title
+            console.print(f"[dim]Indexing {i+1}/{len(documents)}: {fname}[/]")
             if doc.text_content:
                 chunks = retriever.index_fia_document(doc)
-                console.print(f"  Indexed {chunks} chunks from {doc.title[:50]}")
+                if chunks > 0:
+                    indexed_count += 1
+        console.print(f"  [green]Indexed {indexed_count} documents[/]")
+
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not scrape FIA documents: {e}[/]")
+        console.print(f"[yellow]Warning: Could not process documents: {e}[/]")
         console.print("[dim]This may be due to website changes. You can add documents manually.[/]")
+        import traceback
+        traceback.print_exc()
 
     # Load FastF1 data
-    console.print("\n[bold blue]Step 3: Loading race data...[/]")
+    console.print("\n[bold blue]Step 5: Loading race data...[/]")
     try:
         loader = FastF1Loader(settings.cache_dir)
         races = loader.get_season_events(2025)
