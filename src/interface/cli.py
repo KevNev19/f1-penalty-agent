@@ -167,7 +167,7 @@ def setup(
         help="ChromaDB server host (for K8s mode). Default: use local PersistentClient.",
     ),
     chroma_port: int = typer.Option(8000, "--chroma-port", "-p", help="ChromaDB server port."),
-    clean: bool = typer.Option(True, "--clean", "-c", help="Clean up orphaned files and reset database."),
+    clean: bool = typer.Option(True, "--clean/--no-clean", "-c", help="Clean up orphaned files and reset database."),
     limit: int = typer.Option(0, "--limit", "-l", help="Limit number of documents to process (0 for all)."),
 ):
     """Download and index F1 regulations and data."""
@@ -194,13 +194,60 @@ def setup(
     )
     retriever = F1Retriever(vector_store)
 
-    # Scrape FIA documents
-    console.print("[bold blue]Step 1: Checking for documents...[/]")
+    # Load FastF1 data first to get race context
+    console.print("\n[bold blue]Step 0: Initializing Race Context...[/]")
+    target_race_names = []
+    try:
+        loader = FastF1Loader(settings.cache_dir)
+        races = loader.get_season_events(2025)
+
+        if races:
+            console.print(f"  Found {len(races)} races for 2025")
+            # For demo/limit purposes, pick specific races
+            # Default to "Abu Dhabi Grand Prix" (End of season, likely on recent page)
+            if "Abu Dhabi Grand Prix" in races:
+                target_race_names = ["Abu Dhabi Grand Prix"]
+                console.print("  [green]Focusing on: Abu Dhabi Grand Prix[/]")
+            elif "Australian Grand Prix" in races:
+                target_race_names = ["Australian Grand Prix"]
+                console.print("  [green]Focusing on: Australian Grand Prix[/]")
+            else:
+                target_race_names = races[:3]
+                console.print(f"  [green]Focusing on first {len(target_race_names)} races[/]")
+        else:
+            console.print("  [dim]No races found in schedule[/]")
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not load race schedule: {e}[/]")
+
+    # Scrape FIA documents with context
+    console.print("\n[bold blue]Step 1: Checking for documents...[/]")
     scraper = FIAScraper(settings.data_dir)
 
     try:
-        documents = scraper.get_available_documents(season=2025, limit=limit)
-        console.print(f"  Found {len(documents)} documents available")
+        # If limit is used, use "Smart Mode": All Regulations + Decisions for Target Race
+        if limit > 0 and target_race_names:
+             console.print(f"[dim]Smart Mode: Fetching Regulations + Decisions for {target_race_names[0]}[/]")
+             documents = []
+             # 1. Get All Sporting Regulations (Critical)
+             # Optimization: Only re-scrape regs if cleaning or not in incremental mode
+             # But for now, let's always get them to be safe, UNLESS we are explicitly doing an incremental fix
+             # For the "Fix Missing Decisions" fast path, we skip regs if clean=False
+             if clean:
+                 regs = scraper.scrape_regulations(season=2025)
+                 documents.extend(regs)
+             else:
+                 console.print("  [dim]Skipping regulations (Incremental update)...[/]")
+             
+             # 2. Get Decisions for Target Race
+             for race in target_race_names:
+                 decs = scraper.scrape_stewards_decisions(season=2025, race_name=race)
+                 documents.extend(decs)
+                 
+             console.print(f"  Found {len(documents)} context-aware documents")
+        else:
+             # Standard behavior
+             documents = scraper.get_available_documents(season=2025, limit=limit)
+             console.print(f"  Found {len(documents)} documents available")
 
         # Cleanup orphaned files
         if clean:
@@ -249,24 +296,27 @@ def setup(
         import traceback
         traceback.print_exc()
 
-    # Load FastF1 data
+    # Load FastF1 data for the SAME target races
     console.print("\n[bold blue]Step 5: Loading race data...[/]")
     try:
-        loader = FastF1Loader(settings.cache_dir)
-        races = loader.get_season_events(2025)
-
-        if races:
-            console.print(f"  Found {len(races)} races for 2025")
-            # Load a sample race for testing
-            for race in races[:3]:  # First 3 races
+        # Use existing loader
+        if target_race_names:
+             for race in target_race_names:
                 try:
                     penalties = loader.get_race_control_messages(2025, race, "Race")
                     for penalty in penalties:
                         retriever.index_penalty_event(penalty)
                 except Exception as e:
                     console.print(f"[dim]  Could not load {race}: {e}[/]")
-        else:
-            console.print("  [dim]No races found (season may not have started)[/]")
+        elif races:
+             # Fallback if filtered list empty but races exist
+             for race in races[:3]:
+                 try:
+                    penalties = loader.get_race_control_messages(2025, race, "Race")
+                    for penalty in penalties:
+                        retriever.index_penalty_event(penalty)
+                 except Exception:
+                     pass
     except Exception as e:
         console.print(f"[yellow]Warning: Could not load race data: {e}[/]")
 

@@ -179,7 +179,6 @@ class FIAScraper:
                     "vegas",
                     "qatar",
                     "abu_dhabi",
-                    "abu dhabi",
                 ]
                 for race in races:
                     if race in href_lower or race.replace("_", " ") in title_lower:
@@ -188,8 +187,20 @@ class FIAScraper:
 
                 # Filter by race if specified
                 if race_name and event_name:
-                    if race_name.lower() not in event_name.lower():
+                    # Flexible matching: check if either string contains the other
+                    # e.g. "Australia" in "Australian Grand Prix"
+                    r_lower = race_name.lower()
+                    e_lower = event_name.lower()
+                    
+                    # console.print(f"  [dim]Checking: Race={r_lower} vs Event={e_lower}[/]")
+                    
+                    if r_lower not in e_lower and e_lower not in r_lower:
+                        # console.print(f"    [dim]Skipped (mismatch)[/]")
                         continue
+                    # console.print(f"    [green]Match![/]")
+                
+                # Debug found doc
+                # console.print(f"Maybe Found: {title} ({event_name})")
 
                 doc = FIADocument(
                     title=title,
@@ -206,14 +217,14 @@ class FIAScraper:
 
         return documents
 
-    def download_document(self, doc: FIADocument) -> FIADocument:
-        """Download a document and extract its text content.
+    def download_document(self, doc: FIADocument) -> bool:
+        """Download a document if it doesn't exist locally.
 
         Args:
             doc: FIADocument to download.
 
         Returns:
-            Updated FIADocument with local_path and text_content set.
+            True if downloaded, False if skipped (already exists).
         """
         # Determine save location
         if doc.doc_type == "regulation":
@@ -227,23 +238,32 @@ class FIAScraper:
             filename = f"{doc.title[:50].replace(' ', '_')}.pdf"
 
         local_path = save_dir / filename
+        doc.local_path = local_path
 
         # Download if not already present
         if not local_path.exists():
             try:
-                console.print(f"  Downloading: {doc.title[:60]}...")
+                # console.print(f"  Downloading: {doc.title[:60]}...")
                 response = self.session.get(doc.url, timeout=60)
                 response.raise_for_status()
                 local_path.write_bytes(response.content)
+                return True
             except requests.RequestException as e:
                 console.print(f"[red]  Failed to download {doc.title}: {e}[/]")
-                return doc
+                return False
+        return False
 
-        doc.local_path = local_path
+    def extract_text(self, doc: FIADocument) -> None:
+        """Extract text content from the local PDF file.
+        
+        Args:
+            doc: FIADocument with local_path set.
+        """
+        if not doc.local_path or not doc.local_path.exists():
+            return
 
-        # Extract text from PDF
         try:
-            reader = PdfReader(local_path)
+            reader = PdfReader(doc.local_path)
             text_parts = []
             for page in reader.pages:
                 text = page.extract_text()
@@ -253,37 +273,19 @@ class FIAScraper:
         except Exception as e:
             console.print(f"[yellow]  Failed to extract text from {doc.title}: {e}[/]")
 
-        return doc
-
-    def download_all(self, documents: list[FIADocument]) -> list[FIADocument]:
-        """Download all documents with progress indicator.
-
-        Args:
-            documents: List of documents to download.
-
-        Returns:
-            Updated list with downloaded documents.
-        """
-        with Progress() as progress:
-            task = progress.add_task("[cyan]Downloading documents...", total=len(documents))
-            for i, doc in enumerate(documents):
-                documents[i] = self.download_document(doc)
-                progress.update(task, advance=1)
-
-        return documents
-
-    def get_all_documents(self, season: int = 2025) -> list[FIADocument]:
-        """Scrape and download all available documents for a season.
-
+    def get_available_documents(self, season: int = 2025, limit: int = 0) -> list[FIADocument]:
+        """Scrape metadata for all available documents (without downloading).
+        
         Args:
             season: The F1 season year.
+            limit: Maximum resolution documents to return (0 for all).
 
         Returns:
-            List of downloaded FIADocument objects with text content.
+            List of FIADocument objects (without text content).
         """
         all_docs = []
 
-        # Get regulations
+        # Get regulations (prioritize these)
         regulations = self.scrape_regulations(season)
         all_docs.extend(regulations)
 
@@ -291,8 +293,73 @@ class FIAScraper:
         decisions = self.scrape_stewards_decisions(season)
         all_docs.extend(decisions)
 
-        # Download all
-        all_docs = self.download_all(all_docs)
-
-        console.print(f"[green]Downloaded {len(all_docs)} documents[/]")
+        if limit > 0:
+            # If limited, try to get a mix of both types
+            # Prioritize regulations but ensure we get some decisions too
+            target_regs = min(len(regulations), limit // 2 + (limit % 2))
+            target_decs = limit - target_regs
+            
+            # If we don't have enough decisions, fill with more regulations
+            if target_decs > len(decisions):
+                extra_slots = target_decs - len(decisions)
+                target_regs = min(len(regulations), target_regs + extra_slots)
+            
+            # If we don't have enough regulations, fill with more decisions
+            if target_regs > len(regulations):
+                extra_slots = target_regs - len(regulations)
+                target_decs = min(len(decisions), target_decs + extra_slots)
+                
+            return regulations[:target_regs] + decisions[:target_decs]
+            
         return all_docs
+
+    def cleanup_orphaned_files(self, active_documents: list[FIADocument]) -> int:
+        """Remove local files that are no longer present in the active documents list.
+
+        Args:
+            active_documents: List of currently valid documents from the scrape.
+
+        Returns:
+            Number of files removed.
+        """
+        console.print("[bold blue]Cleaning up orphaned files...[/]")
+        
+        # Get set of valid filenames - need to replicate filename logic
+        valid_filenames = set()
+        for doc in active_documents:
+            # Replicate filename logic to know what we expect
+            filename = doc.url.split("/")[-1]
+            if not filename.endswith(".pdf"):
+                filename = f"{doc.title[:50].replace(' ', '_')}.pdf"
+            valid_filenames.add(filename)
+                
+        removed_count = 0
+        
+        # Check regulations directory
+        if self.regulations_dir.exists():
+            for file_path in self.regulations_dir.glob("*.pdf"):
+                if file_path.name not in valid_filenames:
+                    try:
+                        file_path.unlink()
+                        # console.print(f"  [dim]Removed orphaned regulation: {file_path.name}[/]")
+                        removed_count += 1
+                    except Exception as e:
+                        console.print(f"  [yellow]Failed to remove {file_path.name}: {e}[/]")
+
+        # Check stewards directory
+        if self.stewards_dir.exists():
+            for file_path in self.stewards_dir.glob("*.pdf"):
+                if file_path.name not in valid_filenames:
+                    try:
+                        file_path.unlink()
+                        # console.print(f"  [dim]Removed orphaned decision: {file_path.name}[/]")
+                        removed_count += 1
+                    except Exception as e:
+                        console.print(f"  [yellow]Failed to remove {file_path.name}: {e}[/]")
+        
+        if removed_count > 0:
+            console.print(f"[green]Removed {removed_count} orphaned files[/]")
+        else:
+            console.print("[dim]No orphaned files found[/]")
+            
+        return removed_count

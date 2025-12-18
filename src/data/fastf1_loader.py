@@ -129,7 +129,18 @@ class FastF1Loader:
 
                     car_match = re.search(r"CAR\s*(\d+)", message, re.I)
                     if car_match:
-                        driver = f"Car {car_match.group(1)}"
+                        car_number = car_match.group(1)
+                        try:
+                            # Map car number to driver name
+                            drv_info = session.get_driver(car_number)
+                            if not drv_info.empty: # Check if driver found
+                                name = drv_info.get("BroadcastName", drv_info.get("FullName", "Unknown"))
+                                driver = f"{name} ({car_number})"
+                            else:
+                                driver = f"Car {car_number}"
+                        except Exception:
+                            # Fallback if mapping fails
+                            driver = f"Car {car_number}"
 
                     # Only include penalty-related messages
                     if category != "General":
