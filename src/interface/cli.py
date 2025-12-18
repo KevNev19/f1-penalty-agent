@@ -171,13 +171,13 @@ def setup(
     limit: int = typer.Option(0, "--limit", "-l", help="Limit number of documents to process (0 for all)."),
 ):
     """Download and index F1 regulations and data."""
+    from rich.progress import track
+
     from ..config import settings
     from ..data.fastf1_loader import FastF1Loader
     from ..data.fia_scraper import FIAScraper
     from ..rag.retriever import F1Retriever
     from ..rag.vectorstore import VectorStore
-
-    from rich.progress import track
 
     console.print("[bold]Setting up F1 Penalty Agent data...[/]\n")
     if chroma_host:

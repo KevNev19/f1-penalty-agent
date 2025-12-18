@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chromadb import Embeddings
 from rich.console import Console
 
 if TYPE_CHECKING:
@@ -31,7 +32,8 @@ class SearchResult:
     score: float
 
 
-from chromadb import Documents, Embeddings
+
+
 
 class GeminiEmbeddingFunction:
     """Custom embedding function using Google Gemini API."""
@@ -44,6 +46,10 @@ class GeminiEmbeddingFunction:
             self.client = genai.Client(api_key=api_key)
         except ImportError:
             raise ImportError("Please install google-genai to use Gemini embeddings")
+
+    def name(self) -> str:
+        """Return the name of the embedding function."""
+        return f"gemini_{self.model_name}"
 
     def __call__(self, input) -> Embeddings:
         """Generate embeddings for the input texts (for documents).
@@ -73,8 +79,9 @@ class GeminiEmbeddingFunction:
 
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
         """Generate embeddings using Google Gemini REST API (batchEmbedContents)."""
-        import requests
         import time
+
+        import requests
 
         api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
         embeddings = []

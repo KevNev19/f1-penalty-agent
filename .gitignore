@@ -94,3 +94,12 @@ ff1_cache/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Ruff linter cache
+.ruff_cache/
+
+# Claude AI
+.claude/
+
+# Debug data directories
+data/chroma_debug/

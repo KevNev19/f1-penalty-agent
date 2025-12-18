@@ -9,7 +9,6 @@ import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 from rich.console import Console
-from rich.progress import Progress
 
 console = Console()
 
