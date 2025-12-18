@@ -9,8 +9,15 @@ An AI-powered agent that explains Formula 1 penalties and regulations to fans us
 - 🔍 **Semantic Search** - Find relevant regulations and stewards' decisions
 - 🤖 **AI Explanations** - Natural language explanations of penalties using Gemini
 - 📄 **Official Sources** - Uses FIA documents and race data
-- ☸️ **Kubernetes Ready** - Runs ChromaDB in Docker Desktop Kubernetes
+- 💻 **Local First** - Works out-of-box with embedded ChromaDB (no Docker required)
+- ☸️ **Kubernetes Ready** - Optional deployment to Docker Desktop Kubernetes
 - 🔄 **Retry Logic** - Exponential backoff for API rate limits
+
+## Demo
+
+![F1 Penalty Agent Demo](docs/assets/demo.webp)
+
+*The Streamlit chat interface with ChromaDB running in local mode*
 
 ## Quick Start
 
