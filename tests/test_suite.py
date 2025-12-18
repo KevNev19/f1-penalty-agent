@@ -356,7 +356,7 @@ class TestGeminiClient:
         client = GeminiClient(api_key, "gemini-2.0-flash")
         assert client.api_key == api_key
         assert client.model_name == "gemini-2.0-flash"
-        assert client._model is None  # Lazy loading
+        assert client._client is None  # Lazy loading
 
     @pytest.mark.unit
     def test_client_no_api_key_error(self):
@@ -365,7 +365,7 @@ class TestGeminiClient:
 
         client = GeminiClient("", "gemini-2.0-flash")
         with pytest.raises(ValueError, match="API key"):
-            client._get_model()
+            client._get_client()
 
 
 # ============================================================================
@@ -475,11 +475,16 @@ class TestVectorStore:
         assert vs.persist_dir == Path("data/test")
 
     @pytest.mark.integration
-    def test_vectorstore_add_document(self, api_key):
+    def test_vectorstore_add_document(self, api_key, chromadb_container):
         """VectorStore should add documents."""
         from src.rag.vectorstore import Document, VectorStore
 
-        vs = VectorStore(Path("data/test"), api_key, chroma_host="localhost", chroma_port=8000)
+        vs = VectorStore(
+            Path("data/test"),
+            api_key,
+            chroma_host=chromadb_container["host"],
+            chroma_port=chromadb_container["port"],
+        )
         doc = Document(
             content="Test penalty document for integration test",
             metadata={"test": True},
@@ -489,11 +494,16 @@ class TestVectorStore:
         assert count == 1
 
     @pytest.mark.integration
-    def test_vectorstore_search(self, api_key):
+    def test_vectorstore_search(self, api_key, chromadb_container):
         """VectorStore should search and return results."""
         from src.rag.vectorstore import Document, VectorStore
 
-        vs = VectorStore(Path("data/test"), api_key, chroma_host="localhost", chroma_port=8000)
+        vs = VectorStore(
+            Path("data/test"),
+            api_key,
+            chroma_host=chromadb_container["host"],
+            chroma_port=chromadb_container["port"],
+        )
         doc = Document(
             content="Max Verstappen 5-second penalty for track limits violation",
             metadata={"race": "Abu Dhabi"},

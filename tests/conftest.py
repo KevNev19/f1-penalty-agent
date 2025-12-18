@@ -141,3 +141,40 @@ def mock_embedding():
 def mock_embeddings():
     """Multiple mock embeddings for batch testing."""
     return [[0.01 * (i + j) for i in range(768)] for j in range(3)]
+
+
+# ============================================================================
+# Fixtures - ChromaDB Container (for integration tests)
+# ============================================================================
+
+
+@pytest.fixture(scope="session")
+def chromadb_container():
+    """Spin up ChromaDB container for integration tests.
+
+    Automatically starts and stops a ChromaDB Docker container.
+    Requires Docker to be running on the host machine.
+    """
+    try:
+        from testcontainers.chroma import ChromaContainer
+    except ImportError:
+        pytest.skip(
+            "testcontainers[chroma] not installed - run: pip install testcontainers[chroma]"
+        )
+
+    with ChromaContainer() as chroma:
+        yield {
+            "host": chroma.get_container_host_ip(),
+            "port": int(chroma.get_exposed_port(8000)),
+        }
+
+
+@pytest.fixture(scope="session")
+def chroma_client(chromadb_container):
+    """Get a ChromaDB client connected to the test container."""
+    import chromadb
+
+    return chromadb.HttpClient(
+        host=chromadb_container["host"],
+        port=chromadb_container["port"],
+    )
