@@ -5,7 +5,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     User Interface                          │
-│                    (CLI / Future: Web)                      │
+│              (CLI / Streamlit Web UI)                       │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -24,15 +24,16 @@
              │
 ┌────────────▼────────────┐
 │      VectorStore        │
+│  - PersistentClient     │
+│    (local default)      │
 │  - HttpClient (K8s)     │
 │  - Gemini Embeddings    │
-│  - Retry Logic (3x)     │
 └────────────┬────────────┘
              │
 ┌────────────▼────────────┐
-│   ChromaDB (K8s Pod)    │
-│  - Vector Storage       │
-│  - Similarity Search    │
+│      ChromaDB           │
+│  - Local (default)      │
+│  - Docker/K8s (optional)│
 └─────────────────────────┘
 ```
 
@@ -41,9 +42,8 @@
 ### Prerequisites
 
 - Python 3.12+
-- Docker Desktop with Kubernetes enabled
 - Poetry
-- kubectl
+- Docker (optional, for K8s deployment or integration tests)
 
 ### Install
 
@@ -51,15 +51,11 @@
 # Install dependencies (including dev extras)
 poetry install --extras dev
 
-# Deploy ChromaDB
-python scripts/setup_infra.py
-
-# Port-forward (keep running in separate terminal)
-kubectl port-forward -n f1-agent svc/chromadb 8000:8000
-
 # Set up environment
 cp .env.example .env
-# Add your GOOGLE_API_KEY and optionally CHROMA_HOST=localhost
+# Add your GOOGLE_API_KEY
+
+# (Optional) For K8s mode, also set CHROMA_HOST=localhost
 ```
 
 ### Run Tests
@@ -68,7 +64,8 @@ cp .env.example .env
 # Unit tests only (98 tests, no external deps)
 poetry run pytest tests/ -m unit -v
 
-# Integration tests (requires ChromaDB + API key)
+# Integration tests (auto-spins ChromaDB via testcontainers)
+# Requires Docker running
 poetry run pytest tests/ -m integration -v
 
 # All tests with coverage
@@ -111,8 +108,8 @@ poetry run ruff format src/ tests/
 
 ### VectorStore (`src/rag/vectorstore.py`)
 
-- **HttpClient Mode**: Connects to Kubernetes ChromaDB
-- **PersistentClient Mode**: Local mode (not recommended on Windows)
+- **PersistentClient Mode**: Local mode (default, works on all platforms)
+- **HttpClient Mode**: Connects to external ChromaDB (Docker/K8s)
 - **GeminiEmbeddingFunction**: 768-dim embeddings via Gemini API
 - **Retry Logic**: 3 attempts with exponential backoff for rate limits
 
@@ -163,7 +160,7 @@ poetry run ruff format src/ tests/
 | VectorStore | 1 | Initialization |
 | GeminiClient | 2 | Init, API key validation |
 | Infrastructure | 13 | OS detection, K8s manifest validation |
-| **Total Unit** | **43** | |
+| **Total Unit** | **98** | |
 
 ## Troubleshooting
 

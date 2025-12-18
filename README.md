@@ -17,8 +17,8 @@ An AI-powered agent that explains Formula 1 penalties and regulations to fans us
 ### Prerequisites
 
 - Python 3.12+
-- Docker Desktop with Kubernetes enabled
 - Google AI API key ([get one free](https://aistudio.google.com/))
+- Docker (optional, for running ChromaDB in container)
 
 ### Installation
 
@@ -67,8 +67,11 @@ kubectl port-forward -n f1-agent svc/chromadb 8000:8000
 ### Data Setup
 
 ```bash
-# Download and index F1 documents (uses K8s ChromaDB)
-poetry run python -m src.interface.cli setup --chroma-host localhost
+# Download and index F1 documents (uses local ChromaDB by default)
+poetry run f1agent setup
+
+# Or with K8s ChromaDB (if running separately)
+poetry run f1agent setup --chroma-host localhost
 ```
 
 ### Usage
@@ -87,10 +90,7 @@ poetry run python -m src.interface.cli status
 ### Web UI (Streamlit)
 
 ```bash
-# Start the web interface
-$env:CHROMA_HOST="localhost"  # PowerShell
-# export CHROMA_HOST=localhost  # Bash
-
+# Start the web interface (uses local ChromaDB by default)
 streamlit run app.py
 ```
 
