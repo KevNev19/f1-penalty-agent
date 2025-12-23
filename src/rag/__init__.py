@@ -1,7 +1,17 @@
 """RAG (Retrieval-Augmented Generation) pipeline modules."""
 
-from .embeddings import EmbeddingModel
+from .qdrant_store import Document, QdrantVectorStore, SearchResult
+from .reranker import CrossEncoderReranker
 from .retriever import F1Retriever
-from .vectorstore import VectorStore
 
-__all__ = ["EmbeddingModel", "VectorStore", "F1Retriever"]
+# Alias for backward compatibility
+VectorStore = QdrantVectorStore
+
+__all__ = [
+    "Document",
+    "SearchResult",
+    "QdrantVectorStore",
+    "VectorStore",
+    "CrossEncoderReranker",
+    "F1Retriever",
+]

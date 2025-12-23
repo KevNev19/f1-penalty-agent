@@ -5,35 +5,34 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     User Interface                          │
-│              (CLI / Streamlit Web UI)                       │
+│              (CLI / React Frontend / API)                   │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│                       F1Agent                                │
-│  - Query Classification (PENALTY/RULE/GENERAL)              │
-│  - Context Retrieval                                         │
-│  - Response Generation                                       │
+│                     FastAPI Backend                          │
+│  - Health/Ready endpoints                                    │
+│  - /api/v1/ask endpoint                                      │
+│  - /api/v1/setup endpoints                                   │
 └────────────┬─────────────────────────────────┬──────────────┘
              │                                 │
 ┌────────────▼────────────┐      ┌─────────────▼─────────────┐
-│      F1Retriever        │      │      GeminiClient         │
-│  - Document Chunking    │      │  - Chat Generation        │
-│  - Context Building     │      │  - Streaming Support      │
-│  - Race/Driver Extract  │      │  - Retry Logic (3x)       │
-└────────────┬────────────┘      └───────────────────────────┘
-             │
-┌────────────▼────────────┐
-│      VectorStore        │
-│  - PersistentClient     │
-│    (local default)      │
-│  - HttpClient (K8s)     │
-│  - Gemini Embeddings    │
+│       F1Retriever       │      │      GeminiClient         │
+│  - Query expansion      │      │  - Chat Generation        │
+│  - Cross-encoder rerank │      │  - Retry Logic (3x)       │
+│  - Context building     │      └───────────────────────────┘
 └────────────┬────────────┘
              │
 ┌────────────▼────────────┐
-│      ChromaDB           │
-│  - Local (default)      │
-│  - Docker/K8s (optional)│
+│    QdrantVectorStore    │
+│  - Gemini Embeddings    │
+│  - Collection separation│
+│  - Score filtering      │
+└────────────┬────────────┘
+             │
+┌────────────▼────────────┐
+│      Qdrant Cloud       │
+│  (Managed Vector DB)    │
+│  GCP europe-west3       │
 └─────────────────────────┘
 ```
 
@@ -43,156 +42,147 @@
 
 - Python 3.12+
 - Poetry
-- Docker (optional, for K8s deployment or integration tests)
+- Google AI API key
+- Qdrant Cloud account (free tier)
 
 ### Install
 
 ```bash
-# Install dependencies (including dev extras)
-poetry install --extras dev
+# Install dependencies
+poetry install
 
 # Set up environment
 cp .env.example .env
-# Add your GOOGLE_API_KEY
-
-# (Optional) For K8s mode, also set CHROMA_HOST=localhost
+# Add GOOGLE_API_KEY, QDRANT_URL, and QDRANT_API_KEY
 ```
 
 ### Run Tests
 
 ```bash
-# Unit tests only (98 tests, no external deps)
+# Unit tests (18+ tests)
 poetry run pytest tests/ -m unit -v
 
-# Integration tests (auto-spins ChromaDB via testcontainers)
-# Requires Docker running
+# Integration tests
 poetry run pytest tests/ -m integration -v
 
-# All tests with coverage
-poetry run pytest tests/ -v --cov=src
-
-# Run specific test class
-poetry run pytest tests/test_suite.py::TestQueryClassification -v
+# All tests
+poetry run pytest tests/ -v
 ```
 
 ### Linting
 
 ```bash
-# Check for linting errors
+# Check for errors
 poetry run ruff check src/ tests/
 
-# Auto-fix linting errors
+# Auto-fix
 poetry run ruff check src/ tests/ --fix
 
-# Check code formatting
+# Check formatting
 poetry run ruff format src/ tests/ --check
-
-# Auto-format code
-poetry run ruff format src/ tests/
 ```
-
-**Note:** Linting is enforced in CI. PRs will fail if there are linting errors.
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `setup --chroma-host localhost` | Download and index F1 data |
-| `ask "question" --chroma-host localhost` | Ask a single question |
-| `chat` | Interactive chat mode |
-| `status` | Check indexed document counts |
-
-**Tip:** Set `CHROMA_HOST=localhost` in `.env` to avoid `--chroma-host` flags.
 
 ## Key Components
 
-### VectorStore (`src/rag/vectorstore.py`)
+### QdrantVectorStore (`src/rag/qdrant_store.py`)
 
-- **PersistentClient Mode**: Local mode (default, works on all platforms)
-- **HttpClient Mode**: Connects to external ChromaDB (Docker/K8s)
-- **GeminiEmbeddingFunction**: 768-dim embeddings via Gemini API
-- **Retry Logic**: 3 attempts with exponential backoff for rate limits
+- **Gemini Embeddings**: 768-dim vectors via Google API
+- **Collections**: Separate storage for regulations, stewards_decisions, race_data
+- **Score filtering**: Removes low-relevance results (< 0.5)
+- **Auto-collection creation**: Creates collections on first use
+- **API**: Uses `query_points` (qdrant-client 1.16+)
 
-### F1Agent (`src/agent/f1_agent.py`)
+### CrossEncoderReranker (`src/rag/reranker.py`)
 
-- Classifies queries into PENALTY_EXPLANATION, RULE_LOOKUP, or GENERAL
-- Uses regex patterns for query classification
-- Retrieves relevant context from VectorStore
-- Generates viewer-friendly explanations
+- **MS MARCO MiniLM**: Optimized for passage re-ranking
+- **Lazy loading**: Model loaded on first use
+- **Precision boost**: +15-20% improvement
+- **Note**: Disabled on Windows due to torch DLL issues
 
 ### F1Retriever (`src/rag/retriever.py`)
 
-- Text chunking with overlap for context preservation
-- Driver name extraction (Verstappen, Hamilton, etc.)
-- Race/Grand Prix detection
-- Multi-source context building (regulations, stewards, race data)
+- **Query expansion**: F1-specific synonyms
+- **Keyword boosting**: Exact match scoring
+- **Deduplication**: Removes redundant results
 
-### GeminiClient (`src/llm/gemini_client.py`)
+### FastAPI Backend (`src/api/`)
 
-- Synchronous and streaming generation
-- Rate limit handling with exponential backoff (3 retries)
-- Lazy initialization
-- Token counting
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/ready` | GET | Readiness probe (checks Qdrant) |
+| `/api/v1/ask` | POST | Ask a question |
+| `/api/v1/setup/status` | GET | Check data population status |
+| `/api/v1/setup` | POST | Index sample data |
+| `/docs` | GET | OpenAPI documentation |
+
+### CLI (`src/interface/cli.py`)
+
+| Command | Description |
+|---------|-------------|
+| `f1agent status` | Check knowledge base status |
+| `f1agent setup` | Index sample data |
+| `f1agent ask "..."` | Ask a single question |
+| `f1agent chat` | Interactive chat session |
 
 ## Environment Variables
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `GOOGLE_API_KEY` | Google AI API key | Yes | - |
-| `CHROMA_HOST` | ChromaDB server host | No | None (local) |
-| `CHROMA_PORT` | ChromaDB server port | No | 8000 |
-| `LLM_MODEL` | Gemini model name | No | gemini-2.0-flash |
-| `DATA_DIR` | Data storage directory | No | ./data |
-| `LOG_LEVEL` | Logging level | No | INFO |
+| `QDRANT_URL` | Qdrant Cloud cluster URL | Yes | - |
+| `QDRANT_API_KEY` | Qdrant Cloud API key | Yes | - |
+| `LLM_MODEL` | Gemini model | No | gemini-2.0-flash |
 
-## Test Coverage
+## CI/CD Workflows
 
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| Configuration | 6 | Settings, paths, ChromaDB config |
-| Logging | 3 | setup_logging, get_logger |
-| Data Models | 3 | FIADocument, Document, SearchResult |
-| Query Classification | 3 | Penalty, rule, general queries |
-| Text Chunking | 3 | Short/long text, content preservation |
-| Context Extraction | 4 | Driver, race, season extraction |
-| Retrieval Context | 2 | Creation, empty context |
-| Prompts | 3 | Existence, placeholders, enums |
-| VectorStore | 1 | Initialization |
-| GeminiClient | 2 | Init, API key validation |
-| Infrastructure | 13 | OS detection, K8s manifest validation |
-| **Total Unit** | **98** | |
+### `ci.yml` - Continuous Integration
+- **Trigger**: Push/PR to main, develop, feature/*
+- **Jobs**: Lint, Unit Tests, Integration Tests, Docker Build, Package Build
 
-## Troubleshooting
+### `deploy.yml` - Deploy to Cloud Run
+- **Trigger**: Push to main (src changes)
+- **Jobs**: Build → Verify Container → Push → Deploy
 
-### ChromaDB Connection Issues
+### `infrastructure.yml` - Terraform
+- **Trigger**: Push/PR to main (infra changes)
+- **Jobs**: Plan (on PR) → Apply (on merge, requires approval)
 
-```bash
-# Check pod status
-kubectl get pods -n f1-agent
+### `release.yml` - GitHub Release
+- **Trigger**: Version tags (v*)
+- **Jobs**: Build package → Create release
 
-# View logs
-kubectl logs -f deployment/chromadb -n f1-agent
+## Deployment
 
-# Restart port-forward
-kubectl port-forward -n f1-agent svc/chromadb 8000:8000
+### Cloud Run (Automated)
 
-# Check ChromaDB heartbeat
-curl http://localhost:8000/api/v2/heartbeat
-```
-
-### Embedding Rate Limits
-
-The Gemini free tier has rate limits. The code now includes automatic retry logic:
-- 3 retry attempts with exponential backoff (1s, 2s, 4s)
-- If you still hit limits, wait a few seconds between requests
-- Consider upgrading to paid tier for production use
-
-### Test Failures
+Push to `main` triggers automatic deployment. Manual deployment:
 
 ```bash
-# Run only failing tests
-poetry run pytest tests/ --lf -v
+cd infra/terraform
+terraform init
+terraform apply -var="project_id=YOUR_PROJECT" \
+                -var="qdrant_cloud_api_key=YOUR_KEY" \
+                -var="qdrant_account_id=YOUR_ACCOUNT"
 
-# Run with verbose output
-poetry run pytest tests/test_suite.py::TestName -v --tb=long
+# Set Google API key (Qdrant secrets auto-populated)
+echo "your-google-key" | gcloud secrets versions add f1-agent-google-api-key --data-file=-
 ```
+
+### GitHub Secrets Required
+
+| Secret | Description |
+|--------|-------------|
+| `GCP_PROJECT_ID` | GCP Project ID |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Workload Identity Provider |
+| `GCP_SERVICE_ACCOUNT` | Service Account |
+| `QDRANT_URL` | Qdrant cluster URL (for tests) |
+| `QDRANT_API_KEY` | Qdrant API key (for tests) |
+| `QDRANT_CLOUD_API_KEY` | Qdrant management API key |
+| `QDRANT_ACCOUNT_ID` | Qdrant account ID |
+
+### GitHub Environments
+
+Create `production` environment with protection rules for Terraform apply.
+
+See `infra/terraform/` for full configuration.

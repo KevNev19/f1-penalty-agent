@@ -1,0 +1,73 @@
+# Docker ignore file
+# Prevents unnecessary files from being included in Docker build context
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Data directories (will be populated at runtime)
+data/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gemini/
+
+# Terraform
+infra/terraform/
+*.tfstate*
+.terraform/
+
+# Frontend (built separately)
+frontend/
+
+# Local configs
+.env.local
+.env*.local

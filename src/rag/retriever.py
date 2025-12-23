@@ -1,6 +1,7 @@
 """Document retriever with text chunking and context building."""
 
 import hashlib
+import logging
 import re
 from dataclasses import dataclass
 
@@ -8,9 +9,11 @@ from rich.console import Console
 
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
-from .vectorstore import Document, SearchResult, VectorStore
+from .qdrant_store import Document, QdrantVectorStore, SearchResult
+from .reranker import CrossEncoderReranker
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -103,13 +106,21 @@ class F1Retriever:
         "red flag": ["race stopped", "session stopped"],
     }
 
-    def __init__(self, vector_store: VectorStore) -> None:
+    def __init__(
+        self,
+        vector_store: QdrantVectorStore,
+        use_reranker: bool = True,
+    ) -> None:
         """Initialize the retriever.
 
         Args:
-            vector_store: VectorStore instance for document retrieval.
+            vector_store: QdrantVectorStore instance for document retrieval.
+            use_reranker: Whether to use cross-encoder re-ranking for better precision.
         """
         self.vector_store = vector_store
+        self.reranker = CrossEncoderReranker() if use_reranker else None
+        if self.reranker:
+            logger.info("Cross-encoder re-ranking enabled")
 
     def expand_query(self, query: str) -> str:
         """Expand query with F1-specific synonyms for better retrieval.
@@ -279,9 +290,9 @@ class F1Retriever:
 
         # Add to appropriate collection
         if document.doc_type == "regulation":
-            collection = VectorStore.REGULATIONS_COLLECTION
+            collection = QdrantVectorStore.REGULATIONS_COLLECTION
         else:
-            collection = VectorStore.STEWARDS_COLLECTION
+            collection = QdrantVectorStore.STEWARDS_COLLECTION
 
         return self.vector_store.add_documents(docs, collection)
 
@@ -323,7 +334,7 @@ Message: {event.message}
             doc_id=f"penalty_{event.race_name}_{event.season}_{msg_hash}".replace(" ", "_"),
         )
 
-        return self.vector_store.add_documents([doc], VectorStore.RACE_DATA_COLLECTION)
+        return self.vector_store.add_documents([doc], QdrantVectorStore.RACE_DATA_COLLECTION)
 
     def retrieve(
         self,
@@ -369,42 +380,60 @@ Message: {event.message}
             if query_context.get("season"):
                 race_filter = {"season": {"$eq": query_context["season"]}}
 
+        # Determine how many candidates to retrieve
+        # If using reranker, get more candidates for re-ranking
+        retrieve_k = top_k * 4 if self.reranker else top_k
+
         if include_regulations:
             # Regulations don't use context filters (search all)
             regulations = self.vector_store.search(
-                expanded_query, VectorStore.REGULATIONS_COLLECTION, top_k
+                expanded_query, QdrantVectorStore.REGULATIONS_COLLECTION, retrieve_k
             )
             # Apply keyword boosting and deduplication
             regulations = self.boost_keyword_matches(regulations, query)
-            regulations = self.deduplicate_results(regulations)[:top_k]
+            regulations = self.deduplicate_results(regulations)
 
         if include_stewards:
             # Try with filter first, fallback to no filter if no results
             stewards = self.vector_store.search(
-                expanded_query, VectorStore.STEWARDS_COLLECTION, top_k, stewards_filter
+                expanded_query, QdrantVectorStore.STEWARDS_COLLECTION, top_k, stewards_filter
             )
             # If no results with filter, try without filter
             if not stewards and stewards_filter:
                 stewards = self.vector_store.search(
-                    expanded_query, VectorStore.STEWARDS_COLLECTION, top_k
+                    expanded_query, QdrantVectorStore.STEWARDS_COLLECTION, retrieve_k
                 )
             # Apply keyword boosting and deduplication
             stewards = self.boost_keyword_matches(stewards, query)
-            stewards = self.deduplicate_results(stewards)[:top_k]
+            stewards = self.deduplicate_results(stewards)
 
         if include_race_data:
             # Try with filter first, fallback to no filter if no results
             race_data = self.vector_store.search(
-                expanded_query, VectorStore.RACE_DATA_COLLECTION, top_k, race_filter
+                expanded_query, QdrantVectorStore.RACE_DATA_COLLECTION, top_k, race_filter
             )
             # If no results with filter, try without filter
             if not race_data and race_filter:
                 race_data = self.vector_store.search(
-                    expanded_query, VectorStore.RACE_DATA_COLLECTION, top_k
+                    expanded_query, QdrantVectorStore.RACE_DATA_COLLECTION, retrieve_k
                 )
             # Apply keyword boosting and deduplication
             race_data = self.boost_keyword_matches(race_data, query)
-            race_data = self.deduplicate_results(race_data)[:top_k]
+            race_data = self.deduplicate_results(race_data)
+
+        # Apply cross-encoder re-ranking if available
+        if self.reranker:
+            if regulations:
+                regulations = self.reranker.rerank(query, regulations, top_k)
+            if stewards:
+                stewards = self.reranker.rerank(query, stewards, top_k)
+            if race_data:
+                race_data = self.reranker.rerank(query, race_data, top_k)
+        else:
+            # Without reranker, just take top_k
+            regulations = regulations[:top_k]
+            stewards = stewards[:top_k]
+            race_data = race_data[:top_k]
 
         return RetrievalContext(
             regulations=regulations,

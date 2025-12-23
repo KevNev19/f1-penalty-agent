@@ -21,14 +21,12 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     cache_dir: Path = Path("./data/cache")
 
-    # ChromaDB settings
-    chroma_persist_dir: Path = Path("./data/chroma")
-    chroma_host: str | None = None  # Set to "localhost" for K8s mode
-    chroma_port: int = 8000
+    # Qdrant settings
+    qdrant_url: str = ""
+    qdrant_api_key: str = ""
 
     # Model settings
-    embedding_model: str = "all-MiniLM-L6-v2"
-    llm_model: str = "gemini-2.0-flash"  # Free tier compatible
+    llm_model: str = "gemini-2.0-flash"
 
     # RAG settings
     chunk_size: int = 1000
@@ -54,7 +52,6 @@ class Settings(BaseSettings):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.regulations_dir.mkdir(parents=True, exist_ok=True)
         self.stewards_dir.mkdir(parents=True, exist_ok=True)
-        self.chroma_persist_dir.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance

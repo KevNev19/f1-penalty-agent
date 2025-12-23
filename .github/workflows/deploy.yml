@@ -1,0 +1,100 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+  workflow_dispatch: # Manual trigger
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: europe-west3 # Frankfurt - matches Qdrant and Terraform
+  SERVICE_NAME: f1-penalty-agent
+  REGISTRY: europe-west3-docker.pkg.dev
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # For Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          docker tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+                     ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:latest
+
+      - name: Verify Docker container
+        run: |
+          # Start container in background
+          docker run -d --name test-container -p 8000:8000 \
+            -e GOOGLE_API_KEY=test \
+            -e QDRANT_URL=https://test.cloud.qdrant.io \
+            -e QDRANT_API_KEY=test \
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+          # Wait for container to start
+          echo "Waiting for container to start..."
+          sleep 10
+
+          # Check container is running
+          docker ps | grep test-container
+
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          curl --fail --retry 3 --retry-delay 2 http://localhost:8000/health
+
+          # Test docs endpoint loads
+          echo "Testing docs endpoint..."
+          curl --fail --retry 3 --retry-delay 2 http://localhost:8000/docs
+
+          # Check container logs for errors
+          echo "Container logs:"
+          docker logs test-container
+
+          # Cleanup
+          docker stop test-container
+          docker rm test-container
+
+          echo "✅ Container verification passed!"
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/f1-agent/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-secrets=GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest
+
+      - name: Show deployment URL
+        run: |
+          echo "Deployed to:"
+          gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.url)'
