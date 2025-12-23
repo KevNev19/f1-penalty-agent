@@ -11,16 +11,22 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN pip install poetry==2.1.2
+RUN pip install poetry==2.2.1 && poetry self add poetry-plugin-export
 
 # Copy dependency files
 COPY pyproject.toml poetry.lock* ./
 
-# Configure poetry to not create virtual env (we're in container)
-RUN poetry config virtualenvs.create false
+# Export dependencies to requirements.txt, excluding hashes to allow modified wheel selection
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes --only main \
+    && sed -i '/nvidia-/d' requirements.txt \
+    && sed -i '/triton/d' requirements.txt
 
-# Install dependencies (no dev deps)
-RUN poetry install --no-interaction --no-root --only main
+# Install dependencies using pinned CPU-only index for PyTorch
+# We keep PyPI as extra-index for all other packages
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple
 
 # Copy source code
 COPY src/ ./src/
