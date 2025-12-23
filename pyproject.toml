@@ -62,3 +62,7 @@ ignore = ["E501"]  # Allow long lines in prompt strings
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
