@@ -11,7 +11,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Basic health check endpoint.
-    
+
     Returns:
         HealthResponse with current status and version.
     """
@@ -25,9 +25,9 @@ async def health_check() -> HealthResponse:
 @router.get("/ready", response_model=HealthResponse)
 async def readiness_check() -> HealthResponse:
     """Kubernetes readiness probe.
-    
+
     Checks that vector store is accessible.
-    
+
     Returns:
         HealthResponse with detailed status.
     """

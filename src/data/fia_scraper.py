@@ -190,14 +190,14 @@ class FIAScraper:
                     # e.g. "Australia" in "Australian Grand Prix"
                     r_lower = race_name.lower()
                     e_lower = event_name.lower()
-                    
+
                     # console.print(f"  [dim]Checking: Race={r_lower} vs Event={e_lower}[/]")
-                    
+
                     if r_lower not in e_lower and e_lower not in r_lower:
                         # console.print(f"    [dim]Skipped (mismatch)[/]")
                         continue
                     # console.print(f"    [green]Match![/]")
-                
+
                 # Debug found doc
                 # console.print(f"Maybe Found: {title} ({event_name})")
 
@@ -254,7 +254,7 @@ class FIAScraper:
 
     def extract_text(self, doc: FIADocument) -> None:
         """Extract text content from the local PDF file.
-        
+
         Args:
             doc: FIADocument with local_path set.
         """
@@ -274,7 +274,7 @@ class FIAScraper:
 
     def get_available_documents(self, season: int = 2025, limit: int = 0) -> list[FIADocument]:
         """Scrape metadata for all available documents (without downloading).
-        
+
         Args:
             season: The F1 season year.
             limit: Maximum resolution documents to return (0 for all).
@@ -297,19 +297,19 @@ class FIAScraper:
             # Prioritize regulations but ensure we get some decisions too
             target_regs = min(len(regulations), limit // 2 + (limit % 2))
             target_decs = limit - target_regs
-            
+
             # If we don't have enough decisions, fill with more regulations
             if target_decs > len(decisions):
                 extra_slots = target_decs - len(decisions)
                 target_regs = min(len(regulations), target_regs + extra_slots)
-            
+
             # If we don't have enough regulations, fill with more decisions
             if target_regs > len(regulations):
                 extra_slots = target_regs - len(regulations)
                 target_decs = min(len(decisions), target_decs + extra_slots)
-                
+
             return regulations[:target_regs] + decisions[:target_decs]
-            
+
         return all_docs
 
     def cleanup_orphaned_files(self, active_documents: list[FIADocument]) -> int:
@@ -322,7 +322,7 @@ class FIAScraper:
             Number of files removed.
         """
         console.print("[bold blue]Cleaning up orphaned files...[/]")
-        
+
         # Get set of valid filenames - need to replicate filename logic
         valid_filenames = set()
         for doc in active_documents:
@@ -331,9 +331,9 @@ class FIAScraper:
             if not filename.endswith(".pdf"):
                 filename = f"{doc.title[:50].replace(' ', '_')}.pdf"
             valid_filenames.add(filename)
-                
+
         removed_count = 0
-        
+
         # Check regulations directory
         if self.regulations_dir.exists():
             for file_path in self.regulations_dir.glob("*.pdf"):
@@ -355,10 +355,10 @@ class FIAScraper:
                         removed_count += 1
                     except Exception as e:
                         console.print(f"  [yellow]Failed to remove {file_path.name}: {e}[/]")
-        
+
         if removed_count > 0:
             console.print(f"[green]Removed {removed_count} orphaned files[/]")
         else:
             console.print("[dim]No orphaned files found[/]")
-            
+
         return removed_count

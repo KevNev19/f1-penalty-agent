@@ -159,7 +159,7 @@ def status():
             api_key=settings.qdrant_api_key,
             embedding_api_key=settings.google_api_key,
         )
-        
+
         total = 0
         for collection in ["regulations", "stewards_decisions", "race_data"]:
             stats = vector_store.get_collection_stats(collection)
@@ -184,75 +184,74 @@ def setup(
     """Index F1 data into the knowledge base."""
     from ..config import settings
     from ..rag.qdrant_store import Document, QdrantVectorStore
-    
+
     console.print("[bold]F1 Penalty Agent Setup[/]\n")
-    
+
     # Check credentials
     if not settings.google_api_key:
         console.print("[red]Error: GOOGLE_API_KEY not set in .env[/]")
         raise typer.Exit(1)
-    
+
     if not settings.qdrant_url or not settings.qdrant_api_key:
         console.print("[red]Error: QDRANT_URL and QDRANT_API_KEY not set in .env[/]")
         raise typer.Exit(1)
-    
+
     console.print("[green]OK[/] Credentials configured")
     console.print(f"[dim]Indexing {limit} races worth of data...[/]\n")
-    
+
     try:
         vector_store = QdrantVectorStore(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
             embedding_api_key=settings.google_api_key,
         )
-        
+
         if reset:
             console.print("[yellow]Resetting collections...[/]")
             vector_store.reset()
-        
+
         # Index regulations (mock for now - would load from FIA docs)
         console.print("[bold]Indexing regulations...[/]")
         regulations = [
             Document(
                 doc_id="reg-1",
                 content="Track limits are defined by the white lines at the edge of the circuit. Drivers who exceed track limits may have their lap times deleted or receive penalties.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"}
+                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
             ),
             Document(
-                doc_id="reg-2", 
+                doc_id="reg-2",
                 content="A 5-second time penalty is typically applied for minor infractions such as causing a collision, exceeding track limits repeatedly, or unsafe driving.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"}
+                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
             ),
             Document(
                 doc_id="reg-3",
                 content="A 10-second time penalty is applied for more serious infractions or repeat offenses during a Grand Prix.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"}
+                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
             ),
         ]
         vector_store.add_documents(regulations, collection_name="regulations")
         console.print(f"  [green]+{len(regulations)}[/] regulations indexed")
-        
+
         # Index some sample stewards decisions
         console.print("[bold]Indexing stewards decisions...[/]")
         decisions = [
             Document(
                 doc_id="dec-1",
                 content="Driver received a 5-second time penalty for causing a collision at Turn 1. The stewards determined the driver was predominantly at fault for the contact.",
-                metadata={"source": "Stewards Decision", "type": "decision"}
+                metadata={"source": "Stewards Decision", "type": "decision"},
             ),
             Document(
                 doc_id="dec-2",
                 content="Driver received a 10-second time penalty for leaving the track and gaining a lasting advantage. The driver failed to give back the position gained.",
-                metadata={"source": "Stewards Decision", "type": "decision"}
+                metadata={"source": "Stewards Decision", "type": "decision"},
             ),
         ]
         vector_store.add_documents(decisions, collection_name="stewards_decisions")
         console.print(f"  [green]+{len(decisions)}[/] stewards decisions indexed")
 
-        
         console.print("\n[green bold]Setup complete![/]")
         console.print("[dim]Run 'f1agent ask \"What is the penalty for track limits?\"' to test[/]")
-        
+
     except Exception as e:
         console.print(f"[red]Error during setup: {e}[/]")
         raise typer.Exit(1)
@@ -260,4 +259,3 @@ def setup(
 
 if __name__ == "__main__":
     app()
-

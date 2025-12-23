@@ -49,6 +49,7 @@ packages = [{include = "src"}]
 pytest = ">=9.0.0"
 pytest-asyncio = ">=1.3.0"
 ruff = ">=0.14.0"
+pre-commit = "^4.5.1"
 
 [tool.ruff]
 line-length = 100

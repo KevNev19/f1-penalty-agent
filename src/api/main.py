@@ -30,10 +30,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",          # Local dev
-        "http://localhost:5173",          # Vite dev server
-        "https://*.web.app",              # Firebase hosting
-        "https://*.firebaseapp.com",      # Firebase hosting alt
+        "http://localhost:3000",  # Local dev
+        "http://localhost:5173",  # Vite dev server
+        "https://*.web.app",  # Firebase hosting
+        "https://*.firebaseapp.com",  # Firebase hosting alt
     ],
     allow_credentials=True,
     allow_methods=["*"],

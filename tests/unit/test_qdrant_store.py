@@ -48,23 +48,21 @@ class TestSearchResult:
 
 class TestGeminiEmbeddingFunction:
     """Tests for GeminiEmbeddingFunction - mock HTTP calls."""
-    
+
     @pytest.mark.unit
     def test_embed_query_returns_vector(self):
         """Test that embed_query returns a list of floats."""
         from src.rag.qdrant_store import GeminiEmbeddingFunction
-        
+
         with patch("requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "embeddings": [{"values": [0.1] * 768}]
-            }
+            mock_response.json.return_value = {"embeddings": [{"values": [0.1] * 768}]}
             mock_post.return_value = mock_response
-            
+
             ef = GeminiEmbeddingFunction("fake-api-key")
             result = ef.embed_query("test query")
-            
+
             assert len(result) == 768
             assert all(isinstance(x, float) for x in result)
 
@@ -72,7 +70,7 @@ class TestGeminiEmbeddingFunction:
     def test_embed_documents_returns_vectors(self):
         """Test that embed_documents returns list of vectors."""
         from src.rag.qdrant_store import GeminiEmbeddingFunction
-        
+
         with patch("requests.post") as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -83,17 +81,17 @@ class TestGeminiEmbeddingFunction:
                 ]
             }
             mock_post.return_value = mock_response
-            
+
             ef = GeminiEmbeddingFunction("fake-api-key")
             result = ef.embed_documents(["doc1", "doc2"])
-            
+
             assert len(result) == 2
             assert len(result[0]) == 768
 
 
 class TestQdrantVectorStore:
     """Tests for QdrantVectorStore - mock Qdrant client."""
-    
+
     @pytest.fixture
     def mock_qdrant_client(self):
         """Create a mock Qdrant client."""
@@ -106,7 +104,7 @@ class TestQdrantVectorStore:
     def store_with_mocked_client(self, mock_qdrant_client):
         """Create a store with pre-injected mock client."""
         from src.rag.qdrant_store import QdrantVectorStore
-        
+
         # Create store without calling _get_client
         store = object.__new__(QdrantVectorStore)
         store.url = "https://test.cloud.qdrant.io"
@@ -115,7 +113,7 @@ class TestQdrantVectorStore:
         store._embedding_fn = MagicMock()
         store._embedding_fn.embed_query.return_value = [0.1] * 768
         store._embedding_fn.embed_documents.return_value = [[0.1] * 768]
-        
+
         return store
 
     @pytest.mark.unit
@@ -134,9 +132,9 @@ class TestQdrantVectorStore:
                 doc_id="doc_1",
             )
         ]
-        
+
         result = store_with_mocked_client.add_documents(docs, "regulations")
-        
+
         assert result == 1
         mock_qdrant_client.upsert.assert_called_once()
 
@@ -148,13 +146,13 @@ class TestQdrantVectorStore:
         mock_hit.id = 12345
         mock_hit.score = 0.85
         mock_hit.payload = {"content": "Test content", "doc_id": "doc_1", "source": "test"}
-        
+
         mock_response = MagicMock()
         mock_response.points = [mock_hit]
         mock_qdrant_client.query_points.return_value = mock_response
-        
+
         results = store_with_mocked_client.search("test query", "regulations")
-        
+
         assert len(results) == 1
         assert results[0].score == 0.85
         assert results[0].document.doc_id == "doc_1"
@@ -166,13 +164,13 @@ class TestQdrantVectorStore:
         mock_hit.id = 12345
         mock_hit.score = 0.3  # Below threshold
         mock_hit.payload = {"content": "Test content", "doc_id": "doc_1"}
-        
+
         mock_response = MagicMock()
         mock_response.points = [mock_hit]
         mock_qdrant_client.query_points.return_value = mock_response
-        
+
         results = store_with_mocked_client.search("test query", "regulations")
-        
+
         assert len(results) == 0
 
     @pytest.mark.unit
@@ -181,9 +179,9 @@ class TestQdrantVectorStore:
         mock_info = MagicMock()
         mock_info.points_count = 100
         mock_qdrant_client.get_collection.return_value = mock_info
-        
+
         stats = store_with_mocked_client.get_collection_stats("regulations")
-        
+
         assert stats["name"] == "regulations"
         assert stats["count"] == 100
 
@@ -192,9 +190,9 @@ class TestQdrantVectorStore:
         """Test reset deletes all collections."""
         # Mock get_collections for _ensure_collections
         mock_qdrant_client.get_collections.return_value.collections = []
-        
+
         store_with_mocked_client.reset()
-        
+
         # Should delete 3 collections
         assert mock_qdrant_client.delete_collection.call_count == 3
 
@@ -202,7 +200,5 @@ class TestQdrantVectorStore:
     def test_clear_collection(self, store_with_mocked_client, mock_qdrant_client):
         """Test clearing a single collection."""
         store_with_mocked_client.clear_collection("regulations")
-        
-        mock_qdrant_client.delete_collection.assert_called_once_with(
-            collection_name="regulations"
-        )
+
+        mock_qdrant_client.delete_collection.assert_called_once_with(collection_name="regulations")

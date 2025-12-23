@@ -133,8 +133,10 @@ class FastF1Loader:
                         try:
                             # Map car number to driver name
                             drv_info = session.get_driver(car_number)
-                            if not drv_info.empty: # Check if driver found
-                                name = drv_info.get("BroadcastName", drv_info.get("FullName", "Unknown"))
+                            if not drv_info.empty:  # Check if driver found
+                                name = drv_info.get(
+                                    "BroadcastName", drv_info.get("FullName", "Unknown")
+                                )
                                 driver = f"{name} ({car_number})"
                             else:
                                 driver = f"Car {car_number}"

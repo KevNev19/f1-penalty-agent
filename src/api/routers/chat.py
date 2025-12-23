@@ -22,22 +22,22 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 )
 async def ask_question(request: QuestionRequest) -> AnswerResponse:
     """Ask a question about F1 penalties or regulations.
-    
+
     Args:
         request: The question request containing the user's question.
-        
+
     Returns:
         AnswerResponse with the AI-generated answer and sources.
-        
+
     Raises:
         HTTPException: If the question cannot be processed.
     """
     try:
         agent = get_agent()
-        
+
         # Get response from the agent
         response = agent.ask(request.question)
-        
+
         # Convert sources to SourceInfo objects
         # sources_used is a list of strings like "[Source] FIA Sporting Regulations"
         sources = []
@@ -61,14 +61,14 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
                         excerpt=source.get("excerpt", None),
                     )
                 )
-        
+
         return AnswerResponse(
             answer=response.answer,
             sources=sources,
             question=request.question,
             model_used="gemini-2.0-flash",  # AgentResponse doesn't track model
         )
-        
+
     except ValueError as e:
         logger.warning(f"Invalid request: {e}")
         raise HTTPException(

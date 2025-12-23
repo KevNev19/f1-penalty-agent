@@ -22,7 +22,7 @@ class CrossEncoderReranker:
 
     Cross-encoders jointly encode query-document pairs and produce
     more accurate relevance scores than bi-encoder embeddings alone.
-    
+
     Uses the MS MARCO MiniLM model which is optimized for passage re-ranking.
     Expected precision improvement: +15-20% over embedding-only retrieval.
     """
@@ -115,7 +115,7 @@ class CrossEncoderReranker:
 
     def is_available(self) -> bool:
         """Check if the cross-encoder model can be loaded.
-        
+
         Returns:
             True if sentence-transformers is installed and model can load.
         """

@@ -37,13 +37,15 @@ def mock_vector_store():
 @pytest.fixture
 def client(mock_agent, mock_vector_store):
     """Create test client with mocked dependencies."""
-    with patch("src.api.deps.get_agent") as mock_get_agent, \
-         patch("src.api.deps.get_vector_store") as mock_get_vs:
+    with (
+        patch("src.api.deps.get_agent") as mock_get_agent,
+        patch("src.api.deps.get_vector_store") as mock_get_vs,
+    ):
         mock_get_agent.return_value = mock_agent
         mock_get_vs.return_value = mock_vector_store
-        
+
         from src.api.main import app
-        
+
         yield TestClient(app)
 
 
@@ -54,7 +56,7 @@ class TestHealthEndpoints:
     def test_health_check(self, client):
         """Test basic health check returns 200."""
         response = client.get("/health")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
@@ -64,7 +66,7 @@ class TestHealthEndpoints:
     def test_readiness_check(self, client):
         """Test readiness probe returns vector store status."""
         response = client.get("/ready")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ready"
@@ -77,11 +79,8 @@ class TestChatEndpoints:
     @pytest.mark.integration
     def test_ask_question_success(self, client):
         """Test successful question answering."""
-        response = client.post(
-            "/api/v1/ask",
-            json={"question": "Why did Max get a penalty?"}
-        )
-        
+        response = client.post("/api/v1/ask", json={"question": "Why did Max get a penalty?"})
+
         assert response.status_code == 200
         data = response.json()
         assert "answer" in data
@@ -92,22 +91,16 @@ class TestChatEndpoints:
     @pytest.mark.integration
     def test_ask_question_empty_fails(self, client):
         """Test empty question is rejected."""
-        response = client.post(
-            "/api/v1/ask",
-            json={"question": ""}
-        )
-        
+        response = client.post("/api/v1/ask", json={"question": ""})
+
         assert response.status_code == 422  # Validation error
 
     @pytest.mark.integration
     def test_ask_question_too_long_fails(self, client):
         """Test too-long question is rejected."""
         long_question = "x" * 1001
-        response = client.post(
-            "/api/v1/ask",
-            json={"question": long_question}
-        )
-        
+        response = client.post("/api/v1/ask", json={"question": long_question})
+
         assert response.status_code == 422  # Validation error
 
 
@@ -130,7 +123,7 @@ class TestAPIDocumentation:
     def test_openapi_schema(self, client):
         """Test OpenAPI schema is valid."""
         response = client.get("/openapi.json")
-        
+
         assert response.status_code == 200
         schema = response.json()
         assert schema["info"]["title"] == "F1 Penalty Agent API"

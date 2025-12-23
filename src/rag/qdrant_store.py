@@ -34,7 +34,7 @@ class SearchResult:
 
 class GeminiEmbeddingFunction:
     """Custom embedding function using Google Gemini API.
-    
+
     Shared embedding function for consistent embeddings across the application.
     """
 
@@ -66,12 +66,14 @@ class GeminiEmbeddingFunction:
 
             requests_payload = []
             for text in batch_texts:
-                requests_payload.append({
-                    "model": self.model_name,
-                    "content": {"parts": [{"text": text}]},
-                    "taskType": task_type,
-                    "title": "Document" if task_type == "RETRIEVAL_DOCUMENT" else None
-                })
+                requests_payload.append(
+                    {
+                        "model": self.model_name,
+                        "content": {"parts": [{"text": text}]},
+                        "taskType": task_type,
+                        "title": "Document" if task_type == "RETRIEVAL_DOCUMENT" else None,
+                    }
+                )
 
             payload = {"requests": requests_payload}
 
@@ -88,7 +90,7 @@ class GeminiEmbeddingFunction:
                             embeddings.extend([[0.0] * 768] * len(batch_texts))
                         break
                     elif response.status_code == 429:
-                        wait_time = 2 ** attempt
+                        wait_time = 2**attempt
                         console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
                         time.sleep(wait_time)
                     else:
@@ -115,7 +117,7 @@ class QdrantVectorStore:
     REGULATIONS_NAMESPACE = "regulations"
     STEWARDS_NAMESPACE = "stewards_decisions"
     RACE_DATA_NAMESPACE = "race_data"
-    
+
     # Aliases for backward compatibility
     REGULATIONS_COLLECTION = REGULATIONS_NAMESPACE
     STEWARDS_COLLECTION = STEWARDS_NAMESPACE
@@ -152,7 +154,7 @@ class QdrantVectorStore:
                 api_key=self.api_key,
             )
             console.print(f"[green]Connected to Qdrant at: {self.url}[/]")
-            
+
             # Ensure collections exist
             self._ensure_collections()
 
@@ -170,7 +172,7 @@ class QdrantVectorStore:
             try:
                 collections = self._client.get_collections().collections
                 exists = any(c.name == collection_name for c in collections)
-                
+
                 if not exists:
                     self._client.create_collection(
                         collection_name=collection_name,
@@ -186,7 +188,7 @@ class QdrantVectorStore:
     def reset(self) -> None:
         """Reset the vector store by deleting all collections and recreating them."""
         client = self._get_client()
-        
+
         for collection_name in [
             self.REGULATIONS_NAMESPACE,
             self.STEWARDS_NAMESPACE,
@@ -197,7 +199,7 @@ class QdrantVectorStore:
                 console.print(f"  [dim]Deleted collection: {collection_name}[/]")
             except Exception:
                 pass
-        
+
         # Recreate collections
         self._ensure_collections()
         console.print("[yellow]Qdrant vector store reset complete[/]")
@@ -234,22 +236,24 @@ class QdrantVectorStore:
             # Generate a unique integer ID from doc_id or index
             if doc.doc_id:
                 # Use hash of doc_id for consistent integer ID
-                point_id = abs(hash(doc.doc_id)) % (10 ** 18)
+                point_id = abs(hash(doc.doc_id)) % (10**18)
             else:
-                point_id = abs(hash(f"{collection_name}_{i}_{time.time()}")) % (10 ** 18)
-            
+                point_id = abs(hash(f"{collection_name}_{i}_{time.time()}")) % (10**18)
+
             # Store content in payload along with metadata
             payload = {
                 "content": doc.content,
                 "doc_id": doc.doc_id,
                 **doc.metadata,
             }
-            
-            points.append(PointStruct(
-                id=point_id,
-                vector=embedding,
-                payload=payload,
-            ))
+
+            points.append(
+                PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload=payload,
+                )
+            )
 
         # Upsert in batches
         batch_size = 100
@@ -294,9 +298,7 @@ class QdrantVectorStore:
             conditions = []
             for key, value in filter_metadata.items():
                 if isinstance(value, dict) and "$eq" in value:
-                    conditions.append(
-                        FieldCondition(key=key, match=MatchValue(value=value["$eq"]))
-                    )
+                    conditions.append(FieldCondition(key=key, match=MatchValue(value=value["$eq"])))
             if conditions:
                 qdrant_filter = Filter(must=conditions)
 
@@ -313,11 +315,11 @@ class QdrantVectorStore:
         seen_content = set()
 
         # query_points returns QueryResponse with .points attribute
-        points = results.points if hasattr(results, 'points') else results
+        points = results.points if hasattr(results, "points") else results
 
         for hit in points:
             score = hit.score
-            
+
             # Skip low-score results
             if score < 0.5:
                 continue
@@ -347,7 +349,6 @@ class QdrantVectorStore:
                 break
 
         return search_results
-
 
     def search_all_namespaces(
         self,

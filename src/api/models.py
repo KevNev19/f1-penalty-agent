@@ -11,7 +11,9 @@ class QuestionRequest(BaseModel):
         min_length=1,
         max_length=1000,
         description="The F1 penalty or regulation question to ask",
-        json_schema_extra={"example": "Why did Max Verstappen get a penalty at the 2024 Austrian GP?"},
+        json_schema_extra={
+            "example": "Why did Max Verstappen get a penalty at the 2024 Austrian GP?"
+        },
     )
 
 
