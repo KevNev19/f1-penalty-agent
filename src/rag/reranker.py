@@ -71,9 +71,11 @@ class CrossEncoderReranker:
             List of SearchResult objects, re-scored and sorted by relevance.
         """
         if not results:
+            print("DEBUG: No results to rerank")
             return []
 
         if len(results) <= 1:
+            print(f"DEBUG: Single result, skipping rerank. DocID: {results[0].document.doc_id}")
             return results[:top_k]
 
         model = self._get_model()
@@ -81,12 +83,16 @@ class CrossEncoderReranker:
         # Create query-document pairs for the cross-encoder
         pairs = [(query, result.document.content) for result in results]
 
+        print(f"DEBUG: Input Results DocIDs: {[r.document.doc_id for r in results]}")
+
         # Get cross-encoder scores
         scores = model.predict(pairs)
+        print(f"DEBUG: Model Scores: {scores}")
 
         # Create new results with updated scores
         reranked = []
         for result, new_score in zip(results, scores):
+            print(f"DEBUG: Processed {result.document.doc_id} with new score {new_score}")
             # Create a new SearchResult with the cross-encoder score
             # Import here to avoid circular dependency
             from .qdrant_store import Document
