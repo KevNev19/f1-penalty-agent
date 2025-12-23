@@ -16,6 +16,8 @@ mock_st_module.CrossEncoder = mock_cross_encoder_class
 from src.rag.qdrant_store import Document, SearchResult  # noqa: E402
 
 
+@patch("sentence_transformers.CrossEncoder")
+@patch("sentence_transformers.CrossEncoder")
 class TestCrossEncoderReranker:
     """Tests for CrossEncoderReranker class."""
 
@@ -50,30 +52,30 @@ class TestCrossEncoderReranker:
         ]
 
     @pytest.fixture
-    def reranker_with_mock(self):
+    def reranker_with_mock(self, mock_cross_encoder):
         """Create a reranker with mocked CrossEncoder."""
-        with patch.dict(sys.modules, {"sentence_transformers": mock_st_module}):
-            # Reset mocks
-            mock_cross_encoder_class.reset_mock()
-            mock_model = MagicMock()
-            mock_cross_encoder_class.return_value = mock_model
+        # Setup the mock to return a mock model instance
+        mock_model = MagicMock()
+        mock_cross_encoder.return_value = mock_model
 
-            # Import with mocked module
-            from importlib import reload
+        # We need to ensure we re-create the reranker so it picks up the mock
+        from importlib import reload
 
-            import src.rag.reranker as reranker_module
+        import src.rag.reranker as reranker_module
 
-            reload(reranker_module)
+        reload(reranker_module)
 
-            reranker = reranker_module.CrossEncoderReranker()
-            return reranker, mock_model
+        reranker = reranker_module.CrossEncoderReranker()
+        return reranker, mock_model
 
     @pytest.mark.unit
     @pytest.mark.skipif(
         sys.platform == "win32",
         reason="Skipped on Windows due to PyTorch DLL loading issues in test env",
     )
-    def test_rerank_orders_by_cross_encoder_scores(self, reranker_with_mock, sample_results):
+    def test_rerank_orders_by_cross_encoder_scores(
+        self, mock_cross_encoder, reranker_with_mock, sample_results
+    ):
         """Test that rerank reorders results based on cross-encoder scores."""
         reranker, mock_model = reranker_with_mock
 
@@ -95,7 +97,7 @@ class TestCrossEncoderReranker:
         sys.platform == "win32",
         reason="Skipped on Windows due to PyTorch DLL loading issues in test env",
     )
-    def test_rerank_respects_top_k(self, reranker_with_mock, sample_results):
+    def test_rerank_respects_top_k(self, mock_cross_encoder, reranker_with_mock, sample_results):
         """Test that rerank returns at most top_k results."""
         reranker, mock_model = reranker_with_mock
         mock_model.predict.return_value = [0.5, 0.6, 0.7]
@@ -105,14 +107,14 @@ class TestCrossEncoderReranker:
         assert len(results) == 2
 
     @pytest.mark.unit
-    def test_rerank_empty_results(self, reranker_with_mock):
+    def test_rerank_empty_results(self, mock_cross_encoder, reranker_with_mock):
         """Test that rerank handles empty results."""
         reranker, _ = reranker_with_mock
         results = reranker.rerank("query", [], top_k=5)
         assert results == []
 
     @pytest.mark.unit
-    def test_rerank_single_result(self, reranker_with_mock):
+    def test_rerank_single_result(self, mock_cross_encoder, reranker_with_mock):
         """Test that rerank handles single result without calling model."""
         reranker, mock_model = reranker_with_mock
 
@@ -131,54 +133,50 @@ class TestCrossEncoderReranker:
         mock_model.predict.assert_not_called()
 
     @pytest.mark.unit
-    def test_model_lazy_loading(self):
+    def test_model_lazy_loading(self, mock_cross_encoder):
         """Test that model is loaded lazily on first use."""
-        with patch.dict(sys.modules, {"sentence_transformers": mock_st_module}):
-            mock_cross_encoder_class.reset_mock()
+        from importlib import reload
 
-            from importlib import reload
+        import src.rag.reranker as reranker_module
 
-            import src.rag.reranker as reranker_module
+        reload(reranker_module)
 
-            reload(reranker_module)
+        reranker = reranker_module.CrossEncoderReranker()
+        assert reranker._model is None
 
-            reranker = reranker_module.CrossEncoderReranker()
-
-            # Model should not be loaded yet (internal _model is None)
-            assert reranker._model is None
+        # Accessing it should trigger load
+        reranker._get_model()
+        assert reranker._model is not None
+        mock_cross_encoder.assert_called_once()
 
     @pytest.mark.unit
-    def test_default_model_name(self):
+    def test_default_model_name(self, mock_cross_encoder):
         """Test that default model is MS MARCO MiniLM."""
-        with patch.dict(sys.modules, {"sentence_transformers": mock_st_module}):
-            from importlib import reload
+        from importlib import reload
 
-            import src.rag.reranker as reranker_module
+        import src.rag.reranker as reranker_module
 
-            reload(reranker_module)
+        reload(reranker_module)
 
-            assert (
-                reranker_module.CrossEncoderReranker.MODEL_NAME
-                == "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            )
+        assert (
+            reranker_module.CrossEncoderReranker.MODEL_NAME
+            == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
 
     @pytest.mark.unit
-    def test_custom_model_name(self):
+    def test_custom_model_name(self, mock_cross_encoder):
         """Test using custom model name."""
-        with patch.dict(sys.modules, {"sentence_transformers": mock_st_module}):
-            from importlib import reload
+        from importlib import reload
 
-            import src.rag.reranker as reranker_module
+        import src.rag.reranker as reranker_module
 
-            reload(reranker_module)
+        reload(reranker_module)
 
-            reranker = reranker_module.CrossEncoderReranker(model_name="custom/model")
-            assert reranker.model_name == "custom/model"
+        reranker = reranker_module.CrossEncoderReranker(model_name="custom/model")
+        assert reranker.model_name == "custom/model"
 
     @pytest.mark.unit
-    def test_is_available_with_mocked_model(self, reranker_with_mock):
+    def test_is_available_with_mocked_model(self, mock_cross_encoder, reranker_with_mock):
         """Test is_available returns True when model is successfully mocked."""
         reranker, mock_model = reranker_with_mock
-        # Force the model to be set
-        reranker._model = mock_model
         assert reranker.is_available() is True
