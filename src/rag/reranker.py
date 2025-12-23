@@ -89,8 +89,8 @@ class CrossEncoderReranker:
         for result, new_score in zip(results, scores):
             # Create a new SearchResult with the cross-encoder score
             # Import here to avoid circular dependency
-            from .vectorstore import Document
-            from .vectorstore import SearchResult as SR
+            from .qdrant_store import Document
+            from .qdrant_store import SearchResult as SR
 
             reranked.append(
                 SR(
