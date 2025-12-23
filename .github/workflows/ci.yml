@@ -57,8 +57,9 @@ jobs:
         run: poetry install --no-interaction --with dev
 
       - name: Run unit tests
-        run: poetry run pytest tests/ -m unit -v --tb=short
+        run: poetry run pytest tests/ -m unit -v
         env:
+          PYTHONPATH: .
           QDRANT_URL: ${{ secrets.QDRANT_URL }}
           QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
 
