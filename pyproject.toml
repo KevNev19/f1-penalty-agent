@@ -35,13 +35,6 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=9.0.0",
-    "pytest-asyncio>=1.3.0",
-    "ruff>=0.14.0",
-]
-
 [project.scripts]
 f1agent = "src.interface.cli:app"
 
@@ -51,6 +44,11 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{include = "src"}]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=9.0.0"
+pytest-asyncio = ">=1.3.0"
+ruff = ">=0.14.0"
 
 [tool.ruff]
 line-length = 100
