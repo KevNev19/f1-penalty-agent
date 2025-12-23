@@ -71,11 +71,9 @@ class CrossEncoderReranker:
             List of SearchResult objects, re-scored and sorted by relevance.
         """
         if not results:
-            print("DEBUG: No results to rerank")
             return []
 
         if len(results) <= 1:
-            print(f"DEBUG: Single result, skipping rerank. DocID: {results[0].document.doc_id}")
             return results[:top_k]
 
         model = self._get_model()
