@@ -93,6 +93,11 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --service-account=f1-agent-runner@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --cpu-boost \
+            --min-instances=0 \
+            --max-instances=2 \
+            --memory=512Mi \
+            --timeout=300 \
             --set-secrets=GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest
 
       - name: Show deployment URL
