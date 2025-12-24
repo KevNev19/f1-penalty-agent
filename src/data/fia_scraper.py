@@ -267,6 +267,10 @@ class FIAScraper:
             for page in reader.pages:
                 text = page.extract_text()
                 if text:
+                    # Remove BOM and other problematic Unicode characters
+                    text = text.replace("\ufeff", "")  # BOM
+                    text = text.replace("\ufffd", "")  # Replacement character
+                    text = text.encode("ascii", errors="ignore").decode("ascii")
                     text_parts.append(text)
             doc.text_content = "\n\n".join(text_parts)
         except Exception as e:
