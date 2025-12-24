@@ -169,7 +169,9 @@ def status():
             console.print(f"  {emoji} {collection}: {count} documents")
 
         if total == 0:
-            console.print("\n[yellow]Knowledge base is empty. Index data first.[/]")
+            console.print(
+                "\n[yellow]Knowledge base is empty. Run 'f1agent setup' to index data.[/]"
+            )
         else:
             console.print(f"\n[green]Total: {total} indexed documents[/]")
     except Exception as e:
@@ -180,9 +182,18 @@ def status():
 def setup(
     limit: int = typer.Option(3, help="Number of races to index (default: 3)"),
     reset: bool = typer.Option(False, help="Clear existing data before indexing"),
+    season: int = typer.Option(2025, help="F1 season year to index"),
 ):
-    """Index F1 data into the knowledge base."""
+    """Index real F1 data into the knowledge base.
+
+    This command scrapes FIA regulations and stewards decisions,
+    and loads race control messages from FastF1.
+    """
+    from pathlib import Path
+
     from ..config import settings
+    from ..data.fastf1_loader import FastF1Loader
+    from ..data.fia_scraper import FIAScraper
     from ..rag.qdrant_store import Document, QdrantVectorStore
 
     console.print("[bold]F1 Penalty Agent Setup[/]\n")
@@ -197,7 +208,7 @@ def setup(
         raise typer.Exit(1)
 
     console.print("[green]OK[/] Credentials configured")
-    console.print(f"[dim]Indexing {limit} races worth of data...[/]\n")
+    console.print(f"[dim]Indexing data for {season} season (limit: {limit} races)...[/]\n")
 
     try:
         vector_store = QdrantVectorStore(
@@ -210,46 +221,120 @@ def setup(
             console.print("[yellow]Resetting collections...[/]")
             vector_store.reset()
 
-        # Index regulations (mock for now - would load from FIA docs)
-        console.print("[bold]Indexing regulations...[/]")
-        regulations = [
-            Document(
-                doc_id="reg-1",
-                content="Track limits are defined by the white lines at the edge of the circuit. Drivers who exceed track limits may have their lap times deleted or receive penalties.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
-            ),
-            Document(
-                doc_id="reg-2",
-                content="A 5-second time penalty is typically applied for minor infractions such as causing a collision, exceeding track limits repeatedly, or unsafe driving.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
-            ),
-            Document(
-                doc_id="reg-3",
-                content="A 10-second time penalty is applied for more serious infractions or repeat offenses during a Grand Prix.",
-                metadata={"source": "FIA Sporting Regulations", "type": "regulation"},
-            ),
-        ]
-        vector_store.add_documents(regulations, collection_name="regulations")
-        console.print(f"  [green]+{len(regulations)}[/] regulations indexed")
+        # Set up data directories
+        data_dir = Path(settings.data_dir)
+        cache_dir = data_dir / "fastf1_cache"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Index some sample stewards decisions
-        console.print("[bold]Indexing stewards decisions...[/]")
-        decisions = [
-            Document(
-                doc_id="dec-1",
-                content="Driver received a 5-second time penalty for causing a collision at Turn 1. The stewards determined the driver was predominantly at fault for the contact.",
-                metadata={"source": "Stewards Decision", "type": "decision"},
-            ),
-            Document(
-                doc_id="dec-2",
-                content="Driver received a 10-second time penalty for leaving the track and gaining a lasting advantage. The driver failed to give back the position gained.",
-                metadata={"source": "Stewards Decision", "type": "decision"},
-            ),
-        ]
-        vector_store.add_documents(decisions, collection_name="stewards_decisions")
-        console.print(f"  [green]+{len(decisions)}[/] stewards decisions indexed")
+        counts = {"regulations": 0, "stewards_decisions": 0, "race_data": 0}
 
-        console.print("\n[green bold]Setup complete![/]")
+        # --- 1. Index FIA Regulations ---
+        console.print("[bold]Scraping FIA regulations...[/]")
+        try:
+            scraper = FIAScraper(data_dir)
+            regulations = scraper.scrape_regulations(season)
+
+            reg_docs = []
+            for reg in regulations[: limit * 2]:
+                with console.status(f"[dim]Downloading {reg.title[:40]}...[/]"):
+                    scraper.download_document(reg)
+                    scraper.extract_text(reg)
+                    if reg.text_content:
+                        reg_docs.append(
+                            Document(
+                                doc_id=f"reg-{hash(reg.url) % 10000}",
+                                content=reg.text_content[:10000],
+                                metadata={
+                                    "source": reg.title,
+                                    "type": "regulation",
+                                    "url": reg.url,
+                                    "season": season,
+                                },
+                            )
+                        )
+
+            if reg_docs:
+                vector_store.add_documents(reg_docs, collection_name="regulations")
+                counts["regulations"] = len(reg_docs)
+            console.print(f"  [green]+{counts['regulations']}[/] regulations indexed")
+        except Exception as e:
+            console.print(f"  [yellow]Warning: {e}[/]")
+
+        # --- 2. Index Stewards Decisions ---
+        console.print("[bold]Scraping stewards decisions...[/]")
+        try:
+            decisions = scraper.scrape_stewards_decisions(season)
+
+            dec_docs = []
+            for dec in decisions[: limit * 5]:
+                with console.status(f"[dim]Downloading {dec.title[:40]}...[/]"):
+                    scraper.download_document(dec)
+                    scraper.extract_text(dec)
+                    if dec.text_content:
+                        dec_docs.append(
+                            Document(
+                                doc_id=f"dec-{hash(dec.url) % 10000}",
+                                content=dec.text_content,
+                                metadata={
+                                    "source": dec.title,
+                                    "type": "stewards_decision",
+                                    "event": dec.event_name,
+                                    "url": dec.url,
+                                    "season": season,
+                                },
+                            )
+                        )
+
+            if dec_docs:
+                vector_store.add_documents(dec_docs, collection_name="stewards_decisions")
+                counts["stewards_decisions"] = len(dec_docs)
+            console.print(f"  [green]+{counts['stewards_decisions']}[/] stewards decisions indexed")
+        except Exception as e:
+            console.print(f"  [yellow]Warning: {e}[/]")
+
+        # --- 3. Index Race Data (penalties from FastF1) ---
+        console.print("[bold]Loading race control data...[/]")
+        try:
+            loader = FastF1Loader(cache_dir)
+            events = loader.get_season_events(season)
+
+            race_docs = []
+            for event in events[:limit]:
+                with console.status(f"[dim]Loading {event}...[/]"):
+                    try:
+                        penalties = loader.get_race_control_messages(season, event, "Race")
+                        for penalty in penalties:
+                            if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
+                                race_docs.append(
+                                    Document(
+                                        doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
+                                        content=f"Race: {penalty.race_name} ({penalty.session})\n"
+                                        f"Driver: {penalty.driver or 'Unknown'}\n"
+                                        f"Message: {penalty.message}\n"
+                                        f"Category: {penalty.category}",
+                                        metadata={
+                                            "source": f"{penalty.race_name} {penalty.session}",
+                                            "type": "race_control",
+                                            "driver": penalty.driver,
+                                            "race": penalty.race_name,
+                                            "season": season,
+                                        },
+                                    )
+                                )
+                    except Exception as e:
+                        console.print(f"  [dim]Skipped {event}: {e}[/]")
+                        continue
+
+            if race_docs:
+                vector_store.add_documents(race_docs, collection_name="race_data")
+                counts["race_data"] = len(race_docs)
+            console.print(f"  [green]+{counts['race_data']}[/] race control messages indexed")
+        except Exception as e:
+            console.print(f"  [yellow]Warning: {e}[/]")
+
+        total = sum(counts.values())
+        console.print(f"\n[green bold]Setup complete! Indexed {total} documents.[/]")
         console.print("[dim]Run 'f1agent ask \"What is the penalty for track limits?\"' to test[/]")
 
     except Exception as e:
