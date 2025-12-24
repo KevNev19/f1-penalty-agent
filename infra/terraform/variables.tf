@@ -45,3 +45,16 @@ variable "deploy_cloud_run" {
   type        = bool
   default     = false
 }
+
+# GitHub repository for Cloud Build trigger
+variable "github_owner" {
+  description = "GitHub repository owner/organization"
+  type        = string
+  default     = "KevNev19"
+}
+
+variable "github_repo_name" {
+  description = "GitHub repository name"
+  type        = string
+  default     = "f1-penalty-agent"
+}
