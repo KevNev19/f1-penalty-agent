@@ -80,12 +80,14 @@ resource "google_project_iam_member" "deployer_roles" {
     "roles/iam.serviceAccountAdmin",         # Create SAs
     "roles/resourcemanager.projectIamAdmin", # Grant roles to SAs
     "roles/secretmanager.admin",             # Manage secrets
-    "roles/serviceusage.serviceUsageAdmin"   # Enable/list APIs
+    "roles/serviceusage.serviceUsageAdmin",  # Enable/list APIs
+    "roles/cloudbuild.builds.editor"         # Create/manage Cloud Build triggers
   ])
   project = var.project_id
   role    = each.key
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
+
 
 # --- Workload Identity Pool ---
 resource "google_iam_workload_identity_pool" "github_pool" {

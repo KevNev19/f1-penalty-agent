@@ -87,6 +87,7 @@ ff1_cache/
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
+*.tfvars
 
 # Local k3d binaries (use official install)
 *.exe

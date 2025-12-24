@@ -77,6 +77,13 @@ resource "google_project_iam_member" "cloudbuild_secret_accessor" {
   member  = "serviceAccount:${google_service_account.f1_agent.email}"
 }
 
+# Grant Cloud Build SA permission to write logs
+resource "google_project_iam_member" "cloudbuild_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.f1_agent.email}"
+}
+
 # Output the trigger ID
 output "cloudbuild_trigger_id" {
   description = "Cloud Build trigger ID"
