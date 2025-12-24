@@ -93,6 +93,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --service-account=f1-agent-runner@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --port=8000 \
             --cpu-boost \
             --min-instances=0 \
             --max-instances=2 \
