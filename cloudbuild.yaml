@@ -2,8 +2,8 @@
 #
 # Optimized CI/CD pipeline:
 # 1. Lint (fast, catches obvious issues)
-# 2. Build Docker image (includes dependencies)
-# 3. Run tests inside container
+# 2. Test (run tests with dependencies)
+# 3. Build Docker image
 # 4. Push and Deploy
 
 steps:
@@ -21,7 +21,22 @@ steps:
         ruff format --check src/ tests/
 
   # ============================================================
-  # Stage 2: Build Docker image (dependencies installed inside)
+  # Stage 2: Install deps and run tests
+  # ============================================================
+  - name: "python:3.12-slim"
+    id: "test"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -q poetry
+        poetry config virtualenvs.create false
+        poetry install --only main,dev --no-interaction
+        pytest tests/ -v --tb=short -x
+    waitFor: ["lint"]
+
+  # ============================================================
+  # Stage 3: Build Docker image
   # ============================================================
   - name: "gcr.io/cloud-builders/docker"
     id: "build"
@@ -32,32 +47,7 @@ steps:
       - "-t"
       - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:latest"
       - "."
-    waitFor: ["lint"]
-
-  # ============================================================
-  # Stage 3: Run tests inside the built container
-  # ============================================================
-  - name: "gcr.io/cloud-builders/docker"
-    id: "test"
-    args:
-      - "run"
-      - "--rm"
-      - "--entrypoint"
-      - "poetry"
-      - "-e"
-      - "GOOGLE_API_KEY=test"
-      - "-e"
-      - "QDRANT_URL=http://localhost:6333"
-      - "-e"
-      - "QDRANT_API_KEY=test"
-      - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}"
-      - "run"
-      - "pytest"
-      - "tests/"
-      - "-v"
-      - "--tb=short"
-      - "-x"
-    waitFor: ["build"]
+    waitFor: ["test"]
 
   # ============================================================
   # Stage 4: Push and Deploy (only if tests pass)
@@ -68,7 +58,7 @@ steps:
       - "push"
       - "--all-tags"
       - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}"
-    waitFor: ["test"]
+    waitFor: ["build"]
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy"
