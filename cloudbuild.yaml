@@ -39,16 +39,24 @@ steps:
   # ============================================================
   - name: "gcr.io/cloud-builders/docker"
     id: "test"
-    entrypoint: "bash"
     args:
-      - "-c"
-      - |
-        docker run --rm \
-          -e GOOGLE_API_KEY=test \
-          -e QDRANT_URL=http://localhost:6333 \
-          -e QDRANT_API_KEY=test \
-          ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA} \
-          poetry run pytest tests/ -v --tb=short -x
+      - "run"
+      - "--rm"
+      - "--entrypoint"
+      - "poetry"
+      - "-e"
+      - "GOOGLE_API_KEY=test"
+      - "-e"
+      - "QDRANT_URL=http://localhost:6333"
+      - "-e"
+      - "QDRANT_API_KEY=test"
+      - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}"
+      - "run"
+      - "pytest"
+      - "tests/"
+      - "-v"
+      - "--tb=short"
+      - "-x"
     waitFor: ["build"]
 
   # ============================================================
