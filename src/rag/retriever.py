@@ -25,6 +25,23 @@ class RetrievalContext:
     race_data: list[SearchResult]
     query: str
 
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        """Remove BOM and other problematic Unicode characters.
+
+        Args:
+            text: Input text that may contain BOM or other special chars.
+
+        Returns:
+            Cleaned text safe for ASCII encoding.
+        """
+        if not text:
+            return ""
+        # Remove BOM and replacement characters
+        text = text.replace("\ufeff", "").replace("\ufffd", "")
+        # Encode to ASCII, ignoring non-ASCII chars, then decode back
+        return text.encode("ascii", errors="ignore").decode("ascii")
+
     def get_combined_context(self, max_chars: int = 8000) -> str:
         """Get combined context string for the LLM.
 
@@ -43,8 +60,8 @@ class RetrievalContext:
             for result in self.regulations:
                 if char_count > max_chars:
                     break
-                content = result.document.content
-                source = result.document.metadata.get("source", "Unknown")
+                content = self._sanitize_text(result.document.content)
+                source = self._sanitize_text(result.document.metadata.get("source", "Unknown"))
                 parts.append(f"\n[Source: {source}]\n{content}")
                 char_count += len(content)
 
@@ -54,8 +71,8 @@ class RetrievalContext:
             for result in self.stewards_decisions:
                 if char_count > max_chars:
                     break
-                content = result.document.content
-                event = result.document.metadata.get("event", "Unknown")
+                content = self._sanitize_text(result.document.content)
+                event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
                 parts.append(f"\n[Event: {event}]\n{content}")
                 char_count += len(content)
 
@@ -65,7 +82,7 @@ class RetrievalContext:
             for result in self.race_data:
                 if char_count > max_chars:
                     break
-                content = result.document.content
+                content = self._sanitize_text(result.document.content)
                 parts.append(f"\n{content}")
                 char_count += len(content)
 
