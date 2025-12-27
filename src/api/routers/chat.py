@@ -70,13 +70,19 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
         )
 
     except ValueError as e:
-        logger.warning(f"Invalid request: {e}")
+        # Sanitize error message to remove BOM and non-ASCII chars
+        error_msg = str(e).replace("\ufeff", "").replace("\ufffd", "")
+        error_msg = error_msg.encode("ascii", errors="ignore").decode("ascii")
+        logger.warning(f"Invalid request: {error_msg}")
         raise HTTPException(
             status_code=400,
-            detail=str(e),
+            detail=error_msg or "Invalid request",
         )
     except Exception as e:
-        logger.exception(f"Error processing question: {e}")
+        # Sanitize error message for logging
+        error_msg = str(e).replace("\ufeff", "").replace("\ufffd", "")
+        error_msg = error_msg.encode("ascii", errors="ignore").decode("ascii")
+        logger.exception(f"Error processing question: {error_msg}")
         raise HTTPException(
             status_code=500,
             detail="An error occurred while processing your question. Please try again.",

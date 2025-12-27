@@ -137,6 +137,14 @@ class F1Agent:
 
         return template.format(context=context_str, question=query)
 
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        """Remove BOM and other problematic Unicode characters."""
+        if not text:
+            return ""
+        text = str(text).replace("\ufeff", "").replace("\ufffd", "")
+        return text.encode("ascii", errors="ignore").decode("ascii")
+
     def get_sources(self, context: RetrievalContext) -> list[str]:
         """Extract source citations from context.
 
@@ -149,19 +157,21 @@ class F1Agent:
         sources = []
 
         for result in context.regulations[:3]:
-            source = result.document.metadata.get("source", "FIA Regulations")
-            if source not in sources:
+            source = self._sanitize_text(result.document.metadata.get("source", "FIA Regulations"))
+            if source and source not in sources:
                 sources.append(f"[Source] {source}")
 
         for result in context.stewards_decisions[:3]:
-            event = result.document.metadata.get("event", "Unknown")
-            source = result.document.metadata.get("source", "Stewards Decision")
+            event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
+            source = self._sanitize_text(
+                result.document.metadata.get("source", "Stewards Decision")
+            )
             desc = f"[Stewards] {source} ({event})"
             if desc not in sources:
                 sources.append(desc)
 
         for result in context.race_data[:3]:
-            race = result.document.metadata.get("race", "Race")
+            race = self._sanitize_text(result.document.metadata.get("race", "Race"))
             season = result.document.metadata.get("season", "")
             desc = f"[Race Control] {race} {season}"
             if desc not in sources:
