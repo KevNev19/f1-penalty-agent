@@ -40,14 +40,14 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
         response = agent.ask(request.question)
 
         # Convert sources to SourceInfo objects
-        # sources_used is a list of strings like "[Source] FIA Sporting Regulations"
+        # Sanitize ALL text fields to prevent BOM encoding errors in JSON response
         sources = []
         for source in response.sources_used:
             # Handle both string and dict formats
             if isinstance(source, str):
                 sources.append(
                     SourceInfo(
-                        title=source.replace("[Source] ", ""),
+                        title=sanitize_text(source.replace("[Source] ", "")),
                         doc_type="regulation",
                         relevance_score=0.0,
                         excerpt=None,
@@ -56,18 +56,21 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             else:
                 sources.append(
                     SourceInfo(
-                        title=source.get("source", "Unknown"),
-                        doc_type=source.get("doc_type", "unknown"),
+                        title=sanitize_text(source.get("source", "Unknown")),
+                        doc_type=sanitize_text(source.get("doc_type", "unknown")),
                         relevance_score=source.get("score", 0.0),
-                        excerpt=source.get("excerpt", None),
+                        excerpt=sanitize_text(source.get("excerpt") or ""),
                     )
                 )
 
+        # Sanitize the answer to remove any BOM or non-ASCII characters
+        clean_answer = sanitize_text(response.answer)
+
         return AnswerResponse(
-            answer=response.answer,
+            answer=clean_answer,
             sources=sources,
-            question=request.question,
-            model_used="gemini-2.0-flash",  # AgentResponse doesn't track model
+            question=sanitize_text(request.question),
+            model_used="gemini-2.0-flash",
         )
 
     except ValueError as e:
