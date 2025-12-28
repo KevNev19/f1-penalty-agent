@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from ...common.utils import sanitize_text
+from ...common.utils import clean_text
 from ..deps import get_agent
 from ..models import AnswerResponse, ErrorResponse, QuestionRequest, SourceInfo
 
@@ -36,8 +36,11 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
     try:
         agent = get_agent()
 
+        # Clean the incoming question once at the boundary
+        normalized_question = clean_text(request.question)
+
         # Get response from the agent
-        response = agent.ask(request.question)
+        response = agent.ask(normalized_question)
 
         # Convert sources to SourceInfo objects
         # Sanitize ALL text fields to prevent BOM encoding errors in JSON response
@@ -47,7 +50,7 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             if isinstance(source, str):
                 sources.append(
                     SourceInfo(
-                        title=sanitize_text(source.replace("[Source] ", "")),
+                        title=clean_text(source.replace("[Source] ", ""), ascii_only=True),
                         doc_type="regulation",
                         relevance_score=0.0,
                         excerpt=None,
@@ -56,34 +59,32 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             else:
                 sources.append(
                     SourceInfo(
-                        title=sanitize_text(source.get("source", "Unknown")),
-                        doc_type=sanitize_text(source.get("doc_type", "unknown")),
+                        title=clean_text(source.get("source", "Unknown"), ascii_only=True),
+                        doc_type=clean_text(source.get("doc_type", "unknown"), ascii_only=True),
                         relevance_score=source.get("score", 0.0),
-                        excerpt=sanitize_text(source.get("excerpt") or ""),
+                        excerpt=clean_text(source.get("excerpt") or "", ascii_only=True),
                     )
                 )
 
-        # Sanitize the answer to remove any BOM or non-ASCII characters
-        clean_answer = sanitize_text(response.answer)
+        # Clean the answer once before returning
+        clean_answer = clean_text(response.answer, ascii_only=True)
 
         return AnswerResponse(
             answer=clean_answer,
             sources=sources,
-            question=sanitize_text(request.question),
+            question=clean_text(normalized_question, ascii_only=True),
             model_used="gemini-2.0-flash",
         )
 
     except ValueError as e:
-        # Sanitize error message to remove BOM and non-ASCII chars
-        error_msg = sanitize_text(str(e)) or "Invalid request"
+        error_msg = clean_text(str(e), ascii_only=True) or "Invalid request"
         logger.warning(f"Invalid request: {error_msg}")
         raise HTTPException(
             status_code=400,
             detail=error_msg,
         )
     except Exception as e:
-        # Sanitize error message for logging
-        error_msg = sanitize_text(str(e))
+        error_msg = clean_text(str(e), ascii_only=True)
         logger.exception(f"Error processing question: {error_msg}")
         raise HTTPException(
             status_code=500,

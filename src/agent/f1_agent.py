@@ -7,7 +7,6 @@ from enum import Enum
 
 from rich.console import Console
 
-from ..common.utils import sanitize_text
 from ..llm.gemini_client import GeminiClient
 from ..rag.retriever import F1Retriever, RetrievalContext
 from .prompts import (
@@ -138,11 +137,6 @@ class F1Agent:
 
         return template.format(context=context_str, question=query)
 
-    @staticmethod
-    def _sanitize_text(text: str) -> str:
-        """Remove BOM and other problematic Unicode characters."""
-        return sanitize_text(str(text) if text else "")
-
     def get_sources(self, context: RetrievalContext) -> list[str]:
         """Extract source citations from context.
 
@@ -155,21 +149,19 @@ class F1Agent:
         sources = []
 
         for result in context.regulations[:3]:
-            source = self._sanitize_text(result.document.metadata.get("source", "FIA Regulations"))
+            source = result.document.metadata.get("source", "FIA Regulations") or ""
             if source and source not in sources:
                 sources.append(f"[Source] {source}")
 
         for result in context.stewards_decisions[:3]:
-            event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
-            source = self._sanitize_text(
-                result.document.metadata.get("source", "Stewards Decision")
-            )
+            event = result.document.metadata.get("event", "Unknown") or ""
+            source = result.document.metadata.get("source", "Stewards Decision") or ""
             desc = f"[Stewards] {source} ({event})"
             if desc not in sources:
                 sources.append(desc)
 
         for result in context.race_data[:3]:
-            race = self._sanitize_text(result.document.metadata.get("race", "Race"))
+            race = result.document.metadata.get("race", "Race") or "Race"
             season = result.document.metadata.get("season", "")
             desc = f"[Race Control] {race} {season}"
             if desc not in sources:
