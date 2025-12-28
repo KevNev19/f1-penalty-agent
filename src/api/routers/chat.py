@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from ...common.utils import sanitize_text
 from ..deps import get_agent
 from ..models import AnswerResponse, ErrorResponse, QuestionRequest, SourceInfo
 
@@ -71,17 +72,15 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
 
     except ValueError as e:
         # Sanitize error message to remove BOM and non-ASCII chars
-        error_msg = str(e).replace("\ufeff", "").replace("\ufffd", "")
-        error_msg = error_msg.encode("ascii", errors="ignore").decode("ascii")
+        error_msg = sanitize_text(str(e)) or "Invalid request"
         logger.warning(f"Invalid request: {error_msg}")
         raise HTTPException(
             status_code=400,
-            detail=error_msg or "Invalid request",
+            detail=error_msg,
         )
     except Exception as e:
         # Sanitize error message for logging
-        error_msg = str(e).replace("\ufeff", "").replace("\ufffd", "")
-        error_msg = error_msg.encode("ascii", errors="ignore").decode("ascii")
+        error_msg = sanitize_text(str(e))
         logger.exception(f"Error processing question: {error_msg}")
         raise HTTPException(
             status_code=500,

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from ...common.utils import chunk_text, sanitize_text
 from ..deps import get_vector_store
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class SetupRequest(BaseModel):
     """Request model for setup endpoint."""
 
     reset: bool = False
-    limit: int = 3
+    limit: int = 0  # 0 means all data
     season: int = 2025
 
 
@@ -70,7 +71,7 @@ def _run_setup_task(reset: bool, limit: int, season: int) -> dict:
 
     Args:
         reset: Whether to clear existing data first.
-        limit: Number of races to limit data to.
+        limit: Number of races to limit data to (0 = all).
         season: F1 season year.
 
     Returns:
@@ -78,6 +79,7 @@ def _run_setup_task(reset: bool, limit: int, season: int) -> dict:
     """
     from ...data.fastf1_loader import FastF1Loader
     from ...data.fia_scraper import FIAScraper
+    from ...data.jolpica_client import JolpicaClient
     from ...rag.qdrant_store import Document
 
     vector_store = get_vector_store()
@@ -99,29 +101,37 @@ def _run_setup_task(reset: bool, limit: int, season: int) -> dict:
     try:
         scraper = FIAScraper(data_dir)
         regulations = scraper.scrape_regulations(season)
+        # Apply limit: 0 means all, otherwise limit*2 regulations
+        regs_to_process = regulations if limit == 0 else regulations[: limit * 2]
 
         reg_docs = []
-        for reg in regulations[: limit * 2]:  # Get a few regulations
+        for reg in regs_to_process:
             scraper.download_document(reg)
             scraper.extract_text(reg)
             if reg.text_content:
-                reg_docs.append(
-                    Document(
-                        doc_id=f"reg-{hash(reg.url) % 10000}",
-                        content=reg.text_content[:10000],  # Limit content size
-                        metadata={
-                            "source": reg.title,
-                            "type": "regulation",
-                            "url": reg.url,
-                            "season": season,
-                        },
+                # Sanitize and chunk for better search
+                clean_text = sanitize_text(reg.text_content)
+                chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
+                for i, chunk in enumerate(chunks):
+                    reg_docs.append(
+                        Document(
+                            doc_id=f"reg-{hash(reg.url) % 10000}-{i}",
+                            content=chunk,
+                            metadata={
+                                "source": sanitize_text(reg.title),
+                                "type": "regulation",
+                                "url": reg.url,
+                                "season": season,
+                                "chunk_index": i,
+                                "total_chunks": len(chunks),
+                            },
+                        )
                     )
-                )
 
         if reg_docs:
             vector_store.add_documents(reg_docs, collection_name="regulations")
             counts["regulations"] = len(reg_docs)
-            logger.info(f"Indexed {len(reg_docs)} regulations")
+            logger.info(f"Indexed {len(reg_docs)} regulation chunks")
     except Exception as e:
         logger.warning(f"Failed to scrape regulations: {e}")
 
@@ -129,30 +139,37 @@ def _run_setup_task(reset: bool, limit: int, season: int) -> dict:
     logger.info(f"Scraping stewards decisions for {season}...")
     try:
         decisions = scraper.scrape_stewards_decisions(season)
+        # Apply limit: 0 means all, otherwise limit*5 decisions
+        decs_to_process = decisions if limit == 0 else decisions[: limit * 5]
 
         dec_docs = []
-        for dec in decisions[: limit * 5]:  # Get more decisions
+        for dec in decs_to_process:
             scraper.download_document(dec)
             scraper.extract_text(dec)
             if dec.text_content:
-                dec_docs.append(
-                    Document(
-                        doc_id=f"dec-{hash(dec.url) % 10000}",
-                        content=dec.text_content,
-                        metadata={
-                            "source": dec.title,
-                            "type": "stewards_decision",
-                            "event": dec.event_name,
-                            "url": dec.url,
-                            "season": season,
-                        },
+                # Sanitize and chunk stewards decisions
+                clean_text = sanitize_text(dec.text_content)
+                chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
+                for i, chunk in enumerate(chunks):
+                    dec_docs.append(
+                        Document(
+                            doc_id=f"dec-{hash(dec.url) % 10000}-{i}",
+                            content=chunk,
+                            metadata={
+                                "source": sanitize_text(dec.title),
+                                "type": "stewards_decision",
+                                "event": sanitize_text(dec.event_name or ""),
+                                "url": dec.url,
+                                "season": season,
+                                "chunk_index": i,
+                            },
+                        )
                     )
-                )
 
         if dec_docs:
             vector_store.add_documents(dec_docs, collection_name="stewards_decisions")
             counts["stewards_decisions"] = len(dec_docs)
-            logger.info(f"Indexed {len(dec_docs)} stewards decisions")
+            logger.info(f"Indexed {len(dec_docs)} stewards decision chunks")
     except Exception as e:
         logger.warning(f"Failed to scrape stewards decisions: {e}")
 
@@ -161,25 +178,43 @@ def _run_setup_task(reset: bool, limit: int, season: int) -> dict:
     try:
         loader = FastF1Loader(cache_dir)
         events = loader.get_season_events(season)
+        # Apply limit: 0 means all races, otherwise limit races
+        events_to_process = events if limit == 0 else events[:limit]
+
+        # Load Jolpica for driver context
+        jolpica = JolpicaClient()
+        drivers = jolpica.get_drivers(season)
+        driver_map = {d.code: d.name for d in drivers}
+        driver_map.update({str(d.number): d.name for d in drivers if d.number})
 
         race_docs = []
-        for event in events[:limit]:
+        for event in events_to_process:
             try:
                 penalties = loader.get_race_control_messages(season, event, "Race")
                 for penalty in penalties:
                     if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
+                        # Resolve driver name using Jolpica data
+                        driver_name = penalty.driver
+                        if driver_name and driver_name in driver_map:
+                            driver_name = driver_map[driver_name]
+
+                        content = sanitize_text(
+                            f"Race: {penalty.race_name} ({penalty.session})\n"
+                            f"Driver: {driver_name or 'Unknown'}\n"
+                            f"Message: {penalty.message}\n"
+                            f"Category: {penalty.category}"
+                        )
                         race_docs.append(
                             Document(
                                 doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
-                                content=f"Race: {penalty.race_name} ({penalty.session})\n"
-                                f"Driver: {penalty.driver or 'Unknown'}\n"
-                                f"Message: {penalty.message}\n"
-                                f"Category: {penalty.category}",
+                                content=content,
                                 metadata={
-                                    "source": f"{penalty.race_name} {penalty.session}",
+                                    "source": sanitize_text(
+                                        f"{penalty.race_name} {penalty.session}"
+                                    ),
                                     "type": "race_control",
-                                    "driver": penalty.driver,
-                                    "race": penalty.race_name,
+                                    "driver": sanitize_text(driver_name or ""),
+                                    "race": sanitize_text(penalty.race_name),
                                     "season": season,
                                 },
                             )
@@ -204,6 +239,8 @@ async def run_setup(request: SetupRequest) -> SetupResponse:
 
     This endpoint scrapes FIA regulations and stewards decisions,
     and loads race control messages from FastF1.
+
+    Use limit=0 (default) to index ALL available data.
     Use reset=true to clear existing data before indexing.
 
     Args:

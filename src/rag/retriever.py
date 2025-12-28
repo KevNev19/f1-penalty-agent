@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
+from ..common.utils import sanitize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
@@ -35,12 +36,7 @@ class RetrievalContext:
         Returns:
             Cleaned text safe for ASCII encoding.
         """
-        if not text:
-            return ""
-        # Remove BOM and replacement characters
-        text = text.replace("\ufeff", "").replace("\ufffd", "")
-        # Encode to ASCII, ignoring non-ASCII chars, then decode back
-        return text.encode("ascii", errors="ignore").decode("ascii")
+        return sanitize_text(text)
 
     def get_combined_context(self, max_chars: int = 8000) -> str:
         """Get combined context string for the LLM.

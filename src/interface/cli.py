@@ -6,6 +6,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from ..common.utils import chunk_text, sanitize_text
+
 app = typer.Typer(
     name="f1agent",
     help="F1 Penalty Agent - Understand F1 penalties and regulations",
@@ -180,7 +182,7 @@ def status():
 
 @app.command()
 def setup(
-    limit: int = typer.Option(3, help="Number of races to index (default: 3)"),
+    limit: int = typer.Option(0, help="Number of races to index (0 = all)"),
     reset: bool = typer.Option(False, help="Clear existing data before indexing"),
     season: int = typer.Option(2025, help="F1 season year to index"),
 ):
@@ -188,6 +190,9 @@ def setup(
 
     This command scrapes FIA regulations and stewards decisions,
     and loads race control messages from FastF1.
+
+    Use --limit 0 (default) to index ALL available data.
+    Use --limit N to index only N races worth of data.
     """
     from pathlib import Path
 
@@ -208,7 +213,8 @@ def setup(
         raise typer.Exit(1)
 
     console.print("[green]OK[/] Credentials configured")
-    console.print(f"[dim]Indexing data for {season} season (limit: {limit} races)...[/]\n")
+    limit_str = "all" if limit == 0 else str(limit)
+    console.print(f"[dim]Indexing data for {season} season (races: {limit_str})...[/]\n")
 
     try:
         vector_store = QdrantVectorStore(
@@ -234,25 +240,34 @@ def setup(
         try:
             scraper = FIAScraper(data_dir)
             regulations = scraper.scrape_regulations(season)
+            # Apply limit: 0 means all, otherwise limit*2 regulations
+            regs_to_process = regulations if limit == 0 else regulations[: limit * 2]
 
             reg_docs = []
-            for reg in regulations[: limit * 2]:
+            for reg in regs_to_process:
                 with console.status(f"[dim]Downloading {reg.title[:40]}...[/]"):
                     scraper.download_document(reg)
                     scraper.extract_text(reg)
                     if reg.text_content:
-                        reg_docs.append(
-                            Document(
-                                doc_id=f"reg-{hash(reg.url) % 10000}",
-                                content=reg.text_content[:10000],
-                                metadata={
-                                    "source": reg.title,
-                                    "type": "regulation",
-                                    "url": reg.url,
-                                    "season": season,
-                                },
+                        # Sanitize text to remove BOM and non-ASCII
+                        clean_text = sanitize_text(reg.text_content)
+                        # Chunk long documents for better search
+                        chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
+                        for i, chunk in enumerate(chunks):
+                            reg_docs.append(
+                                Document(
+                                    doc_id=f"reg-{hash(reg.url) % 10000}-{i}",
+                                    content=chunk,
+                                    metadata={
+                                        "source": sanitize_text(reg.title),
+                                        "type": "regulation",
+                                        "url": reg.url,
+                                        "season": season,
+                                        "chunk_index": i,
+                                        "total_chunks": len(chunks),
+                                    },
+                                )
                             )
-                        )
 
             if reg_docs:
                 vector_store.add_documents(reg_docs, collection_name="regulations")
@@ -265,26 +280,33 @@ def setup(
         console.print("[bold]Scraping stewards decisions...[/]")
         try:
             decisions = scraper.scrape_stewards_decisions(season)
+            # Apply limit: 0 means all, otherwise limit*5 decisions
+            decs_to_process = decisions if limit == 0 else decisions[: limit * 5]
 
             dec_docs = []
-            for dec in decisions[: limit * 5]:
+            for dec in decs_to_process:
                 with console.status(f"[dim]Downloading {dec.title[:40]}...[/]"):
                     scraper.download_document(dec)
                     scraper.extract_text(dec)
                     if dec.text_content:
-                        dec_docs.append(
-                            Document(
-                                doc_id=f"dec-{hash(dec.url) % 10000}",
-                                content=dec.text_content,
-                                metadata={
-                                    "source": dec.title,
-                                    "type": "stewards_decision",
-                                    "event": dec.event_name,
-                                    "url": dec.url,
-                                    "season": season,
-                                },
+                        # Sanitize and chunk stewards decisions
+                        clean_text = sanitize_text(dec.text_content)
+                        chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
+                        for i, chunk in enumerate(chunks):
+                            dec_docs.append(
+                                Document(
+                                    doc_id=f"dec-{hash(dec.url) % 10000}-{i}",
+                                    content=chunk,
+                                    metadata={
+                                        "source": sanitize_text(dec.title),
+                                        "type": "stewards_decision",
+                                        "event": sanitize_text(dec.event_name or ""),
+                                        "url": dec.url,
+                                        "season": season,
+                                        "chunk_index": i,
+                                    },
+                                )
                             )
-                        )
 
             if dec_docs:
                 vector_store.add_documents(dec_docs, collection_name="stewards_decisions")
@@ -298,26 +320,46 @@ def setup(
         try:
             loader = FastF1Loader(cache_dir)
             events = loader.get_season_events(season)
+            # Apply limit: 0 means all races, otherwise limit races
+            events_to_process = events if limit == 0 else events[:limit]
+
+            # Load Jolpica for driver context
+            from ..data.jolpica_client import JolpicaClient
+
+            jolpica = JolpicaClient()
+            drivers = jolpica.get_drivers(season)
+            driver_map = {d.code: d.name for d in drivers}
+            driver_map.update({str(d.number): d.name for d in drivers if d.number})
 
             race_docs = []
-            for event in events[:limit]:
+            for event in events_to_process:
                 with console.status(f"[dim]Loading {event}...[/]"):
                     try:
                         penalties = loader.get_race_control_messages(season, event, "Race")
                         for penalty in penalties:
                             if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
+                                # Resolve driver name using Jolpica data
+                                driver_name = penalty.driver
+                                if driver_name and driver_name in driver_map:
+                                    driver_name = driver_map[driver_name]
+
+                                content = sanitize_text(
+                                    f"Race: {penalty.race_name} ({penalty.session})\n"
+                                    f"Driver: {driver_name or 'Unknown'}\n"
+                                    f"Message: {penalty.message}\n"
+                                    f"Category: {penalty.category}"
+                                )
                                 race_docs.append(
                                     Document(
                                         doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
-                                        content=f"Race: {penalty.race_name} ({penalty.session})\n"
-                                        f"Driver: {penalty.driver or 'Unknown'}\n"
-                                        f"Message: {penalty.message}\n"
-                                        f"Category: {penalty.category}",
+                                        content=content,
                                         metadata={
-                                            "source": f"{penalty.race_name} {penalty.session}",
+                                            "source": sanitize_text(
+                                                f"{penalty.race_name} {penalty.session}"
+                                            ),
                                             "type": "race_control",
-                                            "driver": penalty.driver,
-                                            "race": penalty.race_name,
+                                            "driver": sanitize_text(driver_name or ""),
+                                            "race": sanitize_text(penalty.race_name),
                                             "season": season,
                                         },
                                     )

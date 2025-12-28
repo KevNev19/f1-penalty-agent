@@ -7,6 +7,7 @@ from enum import Enum
 
 from rich.console import Console
 
+from ..common.utils import sanitize_text
 from ..llm.gemini_client import GeminiClient
 from ..rag.retriever import F1Retriever, RetrievalContext
 from .prompts import (
@@ -140,10 +141,7 @@ class F1Agent:
     @staticmethod
     def _sanitize_text(text: str) -> str:
         """Remove BOM and other problematic Unicode characters."""
-        if not text:
-            return ""
-        text = str(text).replace("\ufeff", "").replace("\ufffd", "")
-        return text.encode("ascii", errors="ignore").decode("ascii")
+        return sanitize_text(str(text) if text else "")
 
     def get_sources(self, context: RetrievalContext) -> list[str]:
         """Extract source citations from context.
