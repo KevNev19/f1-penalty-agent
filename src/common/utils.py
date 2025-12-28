@@ -35,14 +35,27 @@ def chunk_text(
 
     Args:
         text: Text to chunk.
-        chunk_size: Target size of each chunk in characters.
-        chunk_overlap: Overlap between consecutive chunks.
+        chunk_size: Target size of each chunk in characters (must be positive).
+        chunk_overlap: Overlap between consecutive chunks (must be less than chunk_size).
 
     Returns:
         List of text chunks.
+
+    Raises:
+        ValueError: If chunk_overlap >= chunk_size or parameters are invalid.
     """
-    if not text or len(text) <= chunk_size:
-        return [text] if text else []
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    if chunk_overlap < 0:
+        raise ValueError("chunk_overlap must be non-negative")
+    if chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap must be less than chunk_size to avoid infinite loop")
+
+    if not text:
+        return []
+
+    if len(text) <= chunk_size:
+        return [text]
 
     chunks = []
     start = 0
@@ -50,7 +63,7 @@ def chunk_text(
         end = start + chunk_size
         # Try to break at sentence boundary
         if end < len(text):
-            for punct in [". ", ".\n", "? ", "! "]:
+            for punct in [". ", ".\n", "? ", "?\n", "! ", "!\n"]:
                 last_punct = text.rfind(punct, start, end)
                 if last_punct > start + chunk_size // 2:
                     end = last_punct + 1
