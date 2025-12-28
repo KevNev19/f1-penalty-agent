@@ -179,4 +179,4 @@ poetry run ruff check src/ tests/ --fix
 
 ## License
 
-MIT
+This project is licensed under the terms of the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
