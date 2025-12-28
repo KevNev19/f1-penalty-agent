@@ -13,6 +13,7 @@ Requirements:
 
 import os
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 # Add project root to path
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load .env file if it exists
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
@@ -41,20 +43,20 @@ def setup_qdrant():
 
     print(f"🔗 Connecting to Qdrant at: {url}")
 
-    try:
-        from qdrant_client import QdrantClient
-        from qdrant_client.models import Distance, VectorParams
-    except ImportError:
+    if find_spec("qdrant_client") is None:
         print("❌ qdrant-client not installed!")
         print("   Run: poetry install")
         return False
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import Distance, VectorParams
 
     try:
         client = QdrantClient(url=url, api_key=api_key)
         
         # Test connection
         collections = client.get_collections()
-        print(f"✅ Connected successfully!")
+        print("✅ Connected successfully!")
         print(f"   Found {len(collections.collections)} existing collections")
 
         # Define required collections

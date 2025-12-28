@@ -4,8 +4,6 @@ from collections.abc import Generator
 
 from rich.console import Console
 
-from ..common.utils import sanitize_text
-
 console = Console()
 
 
@@ -65,14 +63,10 @@ class GeminiClient:
 
         client = self._get_client()
 
-        # Combine system and user prompts and sanitize to remove BOM characters
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n---\n\nUser Question: {prompt}"
         else:
             full_prompt = prompt
-
-        # Sanitize prompt to prevent encoding errors with BOM characters
-        full_prompt = sanitize_text(full_prompt)
 
         for attempt in range(max_retries):
             try:
@@ -133,9 +127,6 @@ class GeminiClient:
             full_prompt = f"{system_prompt}\n\n---\n\nUser Question: {prompt}"
         else:
             full_prompt = prompt
-
-        # Sanitize prompt to prevent encoding errors
-        full_prompt = sanitize_text(full_prompt)
 
         try:
             # Use generate_content_stream for streaming
