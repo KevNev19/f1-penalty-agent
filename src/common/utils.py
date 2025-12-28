@@ -30,7 +30,8 @@ def clean_text(text: str, *, normalize: bool = True, ascii_only: bool = False) -
     Returns:
         Cleaned text with BOMs removed and optional normalization applied.
     """
-    if not text:
+
+    if text is None:
         return ""
 
     cleaned = text.replace("\ufeff", "").replace("\ufffd", "")

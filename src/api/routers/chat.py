@@ -35,6 +35,7 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
     """
     try:
         agent = get_agent()
+        normalized_question = normalize_text(request.question)
 
         # Clean the incoming question once at the boundary
         normalized_question = clean_text(request.question)

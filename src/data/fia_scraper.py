@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader
 from rich.console import Console
 
+from ..common.utils import normalize_text
+
 console = Console()
 
 
@@ -267,11 +269,9 @@ class FIAScraper:
             for page in reader.pages:
                 text = page.extract_text()
                 if text:
-                    # Remove BOM and other problematic Unicode characters
-                    text = text.replace("\ufeff", "")  # BOM
-                    text = text.replace("\ufffd", "")  # Replacement character
-                    text = text.encode("ascii", errors="ignore").decode("ascii")
-                    text_parts.append(text)
+                    normalized = normalize_text(text)
+                    if normalized:
+                        text_parts.append(normalized)
             doc.text_content = "\n\n".join(text_parts)
         except Exception as e:
             console.print(f"[yellow]  Failed to extract text from {doc.title}: {e}[/]")
