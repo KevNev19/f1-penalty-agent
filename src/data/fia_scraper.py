@@ -36,15 +36,15 @@ class FIAScraper:
         "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14"
     )
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path | str) -> None:
         """Initialize the scraper with data directory.
 
         Args:
             data_dir: Base directory for storing downloaded documents.
         """
-        self.data_dir = data_dir
-        self.regulations_dir = data_dir / "regulations"
-        self.stewards_dir = data_dir / "stewards"
+        self.data_dir = Path(data_dir) if isinstance(data_dir, str) else data_dir
+        self.regulations_dir = self.data_dir / "regulations"
+        self.stewards_dir = self.data_dir / "stewards"
         self.session = requests.Session()
         self.session.headers.update(
             {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
