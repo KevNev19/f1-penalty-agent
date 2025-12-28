@@ -4,6 +4,8 @@ from collections.abc import Generator
 
 from rich.console import Console
 
+from ..common.utils import normalize_text
+
 console = Console()
 
 
@@ -68,6 +70,9 @@ class GeminiClient:
         else:
             full_prompt = prompt
 
+        # Normalize prompt to prevent BOM/whitespace issues while preserving UTF-8
+        full_prompt = normalize_text(full_prompt)
+
         for attempt in range(max_retries):
             try:
                 response = client.models.generate_content(
@@ -127,6 +132,9 @@ class GeminiClient:
             full_prompt = f"{system_prompt}\n\n---\n\nUser Question: {prompt}"
         else:
             full_prompt = prompt
+
+        # Normalize prompt to prevent encoding errors
+        full_prompt = normalize_text(full_prompt)
 
         try:
             # Use generate_content_stream for streaming

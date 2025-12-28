@@ -14,32 +14,45 @@ The application should treat text consistently at the boundaries:
   response boundary for defense-in-depth.
 """
 
-import unicodedata
+import re
 
 
-def clean_text(text: str, *, normalize: bool = True, ascii_only: bool = False) -> str:
-    """Remove BOM markers and optionally normalize/ASCII-fold text.
+def normalize_text(text: str | None) -> str:
+    """Normalize text while preserving UTF-8 characters.
+
+    The helper removes UTF-8 byte order marks (``utf-8-sig``), standardizes
+    whitespace, and trims surrounding space without re-encoding to ASCII. This
+    keeps non-ASCII characters (e.g., café, Nürburgring) intact while removing
+    problematic markers that can appear in scraped documents or API responses.
 
     Args:
-        text: Input text that may contain BOM or special characters.
-        normalize: Whether to apply NFKC normalization for consistent
-            downstream processing. Enabled by default.
-        ascii_only: Whether to discard non-ASCII characters (useful for
-            transport or logging contexts that cannot handle Unicode).
+        text: Input text that may contain BOM or irregular whitespace.
 
     Returns:
-        Cleaned text with BOMs removed and optional normalization applied.
+        Clean, UTF-8-preserving text with normalized whitespace.
     """
 
     if text is None:
         return ""
 
-    cleaned = text.replace("\ufeff", "").replace("\ufffd", "")
-    if normalize:
-        cleaned = unicodedata.normalize("NFKC", cleaned)
-    if ascii_only:
-        cleaned = cleaned.encode("ascii", errors="ignore").decode("ascii")
-    return cleaned
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Remove BOM markers that can appear at the start of documents
+    cleaned = text.replace("\ufeff", "").replace("\ufffe", "")
+
+    # Normalize newlines and collapse repeated spaces/tabs while keeping paragraph breaks
+    cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    return cleaned.strip()
+
+
+def sanitize_text(text: str | None) -> str:
+    """Backward-compatible alias for :func:`normalize_text`."""
+
+    return normalize_text(text)
 
 
 def chunk_text(

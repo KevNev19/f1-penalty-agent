@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
+from ..common.utils import normalize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
@@ -24,6 +25,12 @@ class RetrievalContext:
     stewards_decisions: list[SearchResult]
     race_data: list[SearchResult]
     query: str
+
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        """Normalize text for safe use in prompts and metadata."""
+
+        return normalize_text(text)
 
     def get_combined_context(self, max_chars: int = 8000) -> str:
         """Get combined context string for the LLM.
