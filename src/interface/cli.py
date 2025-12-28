@@ -6,7 +6,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from ..common.utils import chunk_text, sanitize_text
+from ..common.utils import chunk_text, normalize_text
 
 app = typer.Typer(
     name="f1agent",
@@ -249,8 +249,8 @@ def setup(
                     scraper.download_document(reg)
                     scraper.extract_text(reg)
                     if reg.text_content:
-                        # Sanitize text to remove BOM and non-ASCII
-                        clean_text = sanitize_text(reg.text_content)
+                        # Normalize text to remove BOM and clean whitespace
+                        clean_text = normalize_text(reg.text_content)
                         # Chunk long documents for better search
                         chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
                         for i, chunk in enumerate(chunks):
@@ -259,7 +259,7 @@ def setup(
                                     doc_id=f"reg-{hash(reg.url) % 10000}-{i}",
                                     content=chunk,
                                     metadata={
-                                        "source": sanitize_text(reg.title),
+                                        "source": normalize_text(reg.title),
                                         "type": "regulation",
                                         "url": reg.url,
                                         "season": season,
@@ -289,8 +289,8 @@ def setup(
                     scraper.download_document(dec)
                     scraper.extract_text(dec)
                     if dec.text_content:
-                        # Sanitize and chunk stewards decisions
-                        clean_text = sanitize_text(dec.text_content)
+                        # Normalize and chunk stewards decisions
+                        clean_text = normalize_text(dec.text_content)
                         chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
                         for i, chunk in enumerate(chunks):
                             dec_docs.append(
@@ -298,9 +298,9 @@ def setup(
                                     doc_id=f"dec-{hash(dec.url) % 10000}-{i}",
                                     content=chunk,
                                     metadata={
-                                        "source": sanitize_text(dec.title),
+                                        "source": normalize_text(dec.title),
                                         "type": "stewards_decision",
-                                        "event": sanitize_text(dec.event_name or ""),
+                                        "event": normalize_text(dec.event_name or ""),
                                         "url": dec.url,
                                         "season": season,
                                         "chunk_index": i,
@@ -343,7 +343,7 @@ def setup(
                                 if driver_name and driver_name in driver_map:
                                     driver_name = driver_map[driver_name]
 
-                                content = sanitize_text(
+                                content = normalize_text(
                                     f"Race: {penalty.race_name} ({penalty.session})\n"
                                     f"Driver: {driver_name or 'Unknown'}\n"
                                     f"Message: {penalty.message}\n"
@@ -354,12 +354,12 @@ def setup(
                                         doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
                                         content=content,
                                         metadata={
-                                            "source": sanitize_text(
+                                            "source": normalize_text(
                                                 f"{penalty.race_name} {penalty.session}"
                                             ),
                                             "type": "race_control",
-                                            "driver": sanitize_text(driver_name or ""),
-                                            "race": sanitize_text(penalty.race_name),
+                                            "driver": normalize_text(driver_name or ""),
+                                            "race": normalize_text(penalty.race_name),
                                             "season": season,
                                         },
                                     )

@@ -15,11 +15,12 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load .env file if it exists
-from dotenv import load_dotenv
 load_dotenv()
 
 
@@ -54,7 +55,7 @@ def setup_qdrant():
         
         # Test connection
         collections = client.get_collections()
-        print(f"✅ Connected successfully!")
+        print("✅ Connected successfully!")
         print(f"   Found {len(collections.collections)} existing collections")
 
         # Define required collections
