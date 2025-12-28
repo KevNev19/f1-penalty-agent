@@ -3,23 +3,45 @@
 This module contains shared helper functions used across CLI, API, and other components.
 """
 
+import re
 
-def sanitize_text(text: str) -> str:
-    """Remove BOM and non-ASCII characters for API-safe text.
 
-    This function removes Unicode BOM markers and replacement characters,
-    then encodes to ASCII to ensure compatibility with all consumers.
+def normalize_text(text: str | None) -> str:
+    """Normalize text while preserving UTF-8 characters.
+
+    The helper removes UTF-8 byte order marks (``utf-8-sig``), standardizes
+    whitespace, and trims surrounding space without re-encoding to ASCII. This
+    keeps non-ASCII characters (e.g., café, Nürburgring) intact while removing
+    problematic markers that can appear in scraped documents or API responses.
 
     Args:
-        text: Input text that may contain BOM or special characters.
+        text: Input text that may contain BOM or irregular whitespace.
 
     Returns:
-        Clean ASCII-safe text.
+        Clean, UTF-8-preserving text with normalized whitespace.
     """
-    if not text:
+
+    if text is None:
         return ""
-    text = text.replace("\ufeff", "").replace("\ufffd", "")
-    return text.encode("ascii", errors="ignore").decode("ascii")
+
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Remove BOM markers that can appear at the start of documents
+    cleaned = text.replace("\ufeff", "").replace("\ufffe", "")
+
+    # Normalize newlines and collapse repeated spaces/tabs while keeping paragraph breaks
+    cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    return cleaned.strip()
+
+
+def sanitize_text(text: str | None) -> str:
+    """Backward-compatible alias for :func:`normalize_text`."""
+
+    return normalize_text(text)
 
 
 def chunk_text(
