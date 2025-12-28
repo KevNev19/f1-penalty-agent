@@ -1,11 +1,16 @@
 """Jolpica API client for F1 driver and race data (Ergast successor)."""
 
+import logging
 from dataclasses import dataclass
 
 import requests
 from rich.console import Console
 
 console = Console()
+logger = logging.getLogger(__name__)
+
+# Constants
+REQUEST_TIMEOUT = 30
 
 
 @dataclass
@@ -42,6 +47,19 @@ class JolpicaClient:
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "F1-Penalty-Agent/1.0"})
 
+    def __enter__(self) -> "JolpicaClient":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, *args) -> None:
+        """Exit context manager and close session."""
+        self.close()
+
+    def close(self) -> None:
+        """Close the HTTP session."""
+        if self.session:
+            self.session.close()
+
     def _get(self, endpoint: str) -> dict | None:
         """Make a GET request to the API.
 
@@ -53,7 +71,7 @@ class JolpicaClient:
         """
         url = f"{self.BASE_URL}/{endpoint}.json"
         try:
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -142,8 +160,8 @@ class JolpicaClient:
             standings_list = data["MRData"]["StandingsTable"]["StandingsLists"]
             if standings_list:
                 return standings_list[0].get("DriverStandings", [])
-        except (KeyError, TypeError, IndexError):
-            pass
+        except (KeyError, TypeError, IndexError) as e:
+            logger.debug(f"Driver standings parse error: {e}")
 
         return []
 
@@ -165,8 +183,8 @@ class JolpicaClient:
             races = data["MRData"]["RaceTable"]["Races"]
             if races:
                 return races[0].get("Results", [])
-        except (KeyError, TypeError, IndexError):
-            pass
+        except (KeyError, TypeError, IndexError) as e:
+            logger.debug(f"Race results parse error: {e}")
 
         return []
 

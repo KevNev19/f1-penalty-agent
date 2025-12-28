@@ -1,8 +1,12 @@
 """Google Gemini API client for LLM inference using the google-genai SDK."""
 
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from google import genai
 
 from ..common.utils import normalize_text
 
@@ -23,7 +27,7 @@ class GeminiClient:
         self.model_name = model
         self._client = None
 
-    def _get_client(self):
+    def _get_client(self) -> "genai.Client":
         """Lazy load the Gemini client."""
         if self._client is None:
             if not self.api_key:
@@ -88,7 +92,7 @@ class GeminiClient:
                 if not response.candidates:
                     return "I apologize, but I cannot provide a response to that query."
 
-                return response.text
+                return normalize_text(response.text)
 
             except Exception as e:
                 error_msg = str(e).lower()
@@ -144,7 +148,7 @@ class GeminiClient:
                 config=GenerateContentConfig(temperature=temperature),
             ):
                 if chunk.text:
-                    yield chunk.text
+                    yield normalize_text(chunk.text)
 
         except Exception as e:
             error_msg = str(e)

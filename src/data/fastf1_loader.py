@@ -1,5 +1,6 @@
 """FastF1 data loader for race control messages and session data."""
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -7,6 +8,10 @@ from pathlib import Path
 from rich.console import Console
 
 console = Console()
+logger = logging.getLogger(__name__)
+
+# Constants
+DEFAULT_SEASON = 2025
 
 
 @dataclass
@@ -205,7 +210,7 @@ class FastF1Loader:
 
         return results
 
-    def get_season_events(self, season: int = 2025) -> list[str]:
+    def get_season_events(self, season: int = DEFAULT_SEASON) -> list[str]:
         """Get list of events/races for a season.
 
         Args:
@@ -228,7 +233,7 @@ class FastF1Loader:
             console.print(f"[yellow]Could not get schedule: {e}[/]")
             return []
 
-    def get_all_penalties_for_season(self, season: int = 2025) -> list[PenaltyEvent]:
+    def get_all_penalties_for_season(self, season: int = DEFAULT_SEASON) -> list[PenaltyEvent]:
         """Get all penalty events for an entire season.
 
         Args:

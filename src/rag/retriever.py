@@ -50,8 +50,8 @@ class RetrievalContext:
             for result in self.regulations:
                 if char_count > max_chars:
                     break
-                content = result.document.content or ""
-                source = result.document.metadata.get("source", "Unknown") or ""
+                content = normalize_text(result.document.content or "")
+                source = normalize_text(result.document.metadata.get("source", "Unknown") or "")
                 parts.append(f"\n[Source: {source}]\n{content}")
                 char_count += len(content)
 
@@ -61,8 +61,8 @@ class RetrievalContext:
             for result in self.stewards_decisions:
                 if char_count > max_chars:
                     break
-                content = result.document.content or ""
-                event = result.document.metadata.get("event", "Unknown") or ""
+                content = normalize_text(result.document.content or "")
+                event = normalize_text(result.document.metadata.get("event", "Unknown") or "")
                 parts.append(f"\n[Event: {event}]\n{content}")
                 char_count += len(content)
 
@@ -72,7 +72,7 @@ class RetrievalContext:
             for result in self.race_data:
                 if char_count > max_chars:
                     break
-                content = result.document.content or ""
+                content = normalize_text(result.document.content or "")
                 parts.append(f"\n{content}")
                 char_count += len(content)
 

@@ -1,5 +1,6 @@
 """FIA document scraper for regulations and stewards decisions."""
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,11 @@ from rich.console import Console
 from ..common.utils import normalize_text
 
 console = Console()
+logger = logging.getLogger(__name__)
+
+# Constants
+REQUEST_TIMEOUT = 30
+DOWNLOAD_TIMEOUT = 60
 
 
 @dataclass
@@ -56,6 +62,19 @@ class FIAScraper:
         self.regulations_dir.mkdir(parents=True, exist_ok=True)
         self.stewards_dir.mkdir(parents=True, exist_ok=True)
 
+    def __enter__(self) -> "FIAScraper":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, *args) -> None:
+        """Exit context manager and close session."""
+        self.close()
+
+    def close(self) -> None:
+        """Close the HTTP session."""
+        if self.session:
+            self.session.close()
+
     def scrape_regulations(self, season: int = 2025) -> list[FIADocument]:
         """Scrape F1 sporting regulations for a given season.
 
@@ -69,7 +88,7 @@ class FIAScraper:
         documents = []
 
         try:
-            response = self.session.get(self.REGULATIONS_URL, timeout=30)
+            response = self.session.get(self.REGULATIONS_URL, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "lxml")
 
@@ -120,7 +139,7 @@ class FIAScraper:
         # The season-specific URL often returns 500 errors
         try:
             url = self.DECISIONS_BASE_URL
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "lxml")
 
@@ -245,7 +264,7 @@ class FIAScraper:
         if not local_path.exists():
             try:
                 # console.print(f"  Downloading: {doc.title[:60]}...")
-                response = self.session.get(doc.url, timeout=60)
+                response = self.session.get(doc.url, timeout=DOWNLOAD_TIMEOUT)
                 response.raise_for_status()
                 local_path.write_bytes(response.content)
                 return True
