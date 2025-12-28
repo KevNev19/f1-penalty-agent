@@ -49,6 +49,10 @@ app.include_router(setup.router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize resources on startup."""
+    from ..common.debug import log_encoding_info
+
+    log_encoding_info()
+
     logger.info("F1 Penalty Agent API starting up...")
     logger.info("API docs available at /docs")
 
