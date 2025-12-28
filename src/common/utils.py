@@ -1,6 +1,17 @@
 """Common utilities for the F1 Penalty Agent.
 
-This module contains shared helper functions used across CLI, API, and other components.
+Text handling contract
+----------------------
+The application should treat text consistently at the boundaries:
+
+* Incoming documents and user inputs should have BOM markers stripped so
+  downstream processing does not see spurious characters.
+* Normalization should be explicit. Callers can opt into Unicode
+  normalization for deterministic indexing/serialization, or request
+  ASCII-only output when interacting with systems that require it.
+* Internal layers should assume text is already clean and avoid repeated
+  sanitization; a final clean pass is allowed at the outermost API
+  response boundary for defense-in-depth.
 """
 
 import re

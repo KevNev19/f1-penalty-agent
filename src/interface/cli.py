@@ -252,7 +252,7 @@ def setup(
                         # Normalize text to remove BOM and clean whitespace
                         clean_text = normalize_text(reg.text_content)
                         # Chunk long documents for better search
-                        chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
+                        chunks = chunk_text(cleaned_text, chunk_size=1500, chunk_overlap=200)
                         for i, chunk in enumerate(chunks):
                             reg_docs.append(
                                 Document(

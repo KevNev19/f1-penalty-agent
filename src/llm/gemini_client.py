@@ -65,7 +65,6 @@ class GeminiClient:
 
         client = self._get_client()
 
-        # Combine system and user prompts and sanitize to remove BOM characters
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n---\n\nUser Question: {prompt}"
         else:
