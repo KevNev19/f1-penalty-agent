@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
-from ..common.utils import normalize_text
+from ..common.utils import chunk_text, normalize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
