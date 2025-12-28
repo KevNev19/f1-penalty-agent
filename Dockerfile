@@ -56,6 +56,11 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
+# Set encoding to UTF-8 to prevent ASCII errors with BOM
+ENV PYTHONIOENCODING=utf-8
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
 # Expose port
 EXPOSE 8000
 
