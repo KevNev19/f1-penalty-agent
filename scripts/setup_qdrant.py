@@ -53,7 +53,7 @@ def setup_qdrant():
 
     try:
         client = QdrantClient(url=url, api_key=api_key)
-        
+
         # Test connection
         collections = client.get_collections()
         print("✅ Connected successfully!")
@@ -65,7 +65,7 @@ def setup_qdrant():
 
         for collection_name in required_collections:
             exists = any(c.name == collection_name for c in collections.collections)
-            
+
             if exists:
                 info = client.get_collection(collection_name)
                 print(f"   ✅ {collection_name}: {info.points_count} vectors")

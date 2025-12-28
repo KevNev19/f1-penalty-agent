@@ -102,6 +102,8 @@ curl -X POST "http://localhost:8000/api/v1/setup" \
 | `QDRANT_URL` | Qdrant Cloud cluster URL | Yes |
 | `QDRANT_API_KEY` | Qdrant Cloud API key | Yes |
 | `LLM_MODEL` | Gemini model | No (default: gemini-2.0-flash) |
+| `LLM_REQUESTS_PER_MINUTE` | Client-side limit for Gemini generate/count calls | No (default: 15) |
+| `EMBEDDING_REQUESTS_PER_MINUTE` | Client-side limit for embedding batch requests | No (default: 60) |
 
 ## Project Structure
 

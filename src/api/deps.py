@@ -1,52 +1,45 @@
-"""FastAPI dependency injection for F1 Agent."""
-
 import logging
 from functools import lru_cache
 
-from ..agent.f1_agent import F1Agent
-from ..config import settings
-from ..llm.gemini_client import GeminiClient
+from ..application.services.ask_question import AskQuestionService
+from ..composition.container import (
+    get_ask_service as _get_ask_service,
+)
+from ..composition.container import (
+    get_llm as _get_llm,
+)
+from ..composition.container import (
+    get_retriever as _get_retriever,
+)
+from ..composition.container import (
+    get_vector_store as _get_vector_store,
+)
+from ..ports.llm import LLMPort
+from ..ports.retrieval import RetrievalPort
 from ..rag.qdrant_store import QdrantVectorStore
-from ..rag.retriever import F1Retriever
 
 logger = logging.getLogger(__name__)
 
 
 @lru_cache
 def get_vector_store() -> QdrantVectorStore:
-    """Get or create the QdrantVectorStore singleton."""
-    logger.info("Initializing QdrantVectorStore...")
-    return QdrantVectorStore(
-        url=settings.qdrant_url,
-        api_key=settings.qdrant_api_key,
-        embedding_api_key=settings.google_api_key,
-    )
+    logger.info("Delegating to composition root for vector store...")
+    return _get_vector_store()
 
 
 @lru_cache
-def get_retriever() -> F1Retriever:
-    """Get or create the F1Retriever singleton."""
-    logger.info("Initializing F1Retriever...")
-    vector_store = get_vector_store()
-    # Disable reranker for cross-platform compatibility (torch has issues on Windows)
-    # In production Docker/Linux, this can be enabled for better accuracy
-    return F1Retriever(vector_store, use_reranker=False)
+def get_retriever() -> RetrievalPort:
+    logger.info("Delegating to composition root for retriever...")
+    return _get_retriever()
 
 
 @lru_cache
-def get_llm_client() -> GeminiClient:
-    """Get or create the GeminiClient singleton."""
-    logger.info("Initializing GeminiClient...")
-    return GeminiClient(
-        api_key=settings.google_api_key,
-        model=settings.llm_model,
-    )
+def get_llm_client() -> LLMPort:
+    logger.info("Delegating to composition root for llm...")
+    return _get_llm()
 
 
 @lru_cache
-def get_agent() -> F1Agent:
-    """Get or create the F1Agent singleton."""
-    logger.info("Initializing F1Agent...")
-    retriever = get_retriever()
-    llm_client = get_llm_client()
-    return F1Agent(retriever=retriever, llm_client=llm_client)
+def get_question_service() -> AskQuestionService:
+    logger.info("Delegating to composition root for ask service...")
+    return _get_ask_service()

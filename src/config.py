@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     # Model settings
     llm_model: str = "gemini-2.0-flash"
+    llm_requests_per_minute: int | None = 15
+    embedding_requests_per_minute: int | None = 60
 
     # RAG settings
     chunk_size: int = 1000
