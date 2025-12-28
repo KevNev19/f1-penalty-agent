@@ -38,8 +38,8 @@ def mock_vector_store():
 def client(mock_agent, mock_vector_store):
     """Create test client with mocked dependencies."""
     with (
-        patch("src.api.deps.get_agent") as mock_get_agent,
-        patch("src.api.deps.get_vector_store") as mock_get_vs,
+        patch("src.api.routers.chat.get_agent") as mock_get_agent,
+        patch("src.api.routers.health.get_vector_store") as mock_get_vs,
     ):
         mock_get_agent.return_value = mock_agent
         mock_get_vs.return_value = mock_vector_store
