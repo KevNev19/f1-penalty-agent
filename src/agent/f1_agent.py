@@ -155,20 +155,20 @@ class F1Agent:
         sources = []
 
         for result in context.regulations[:3]:
-            source = result.document.metadata.get("source", "FIA Regulations") or ""
+            source = self._sanitize_text(result.document.metadata.get("source", "FIA Regulations"))
             if source and source not in sources:
                 sources.append(f"[Source] {source}")
 
         for result in context.stewards_decisions[:3]:
-            event = result.document.metadata.get("event", "Unknown") or ""
-            source = result.document.metadata.get("source", "Stewards Decision") or ""
+            event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
+            source = self._sanitize_text(result.document.metadata.get("source", "Stewards Decision"))
             desc = f"[Stewards] {source} ({event})"
             if desc not in sources:
                 sources.append(desc)
 
         for result in context.race_data[:3]:
-            race = result.document.metadata.get("race", "Race") or "Race"
-            season = result.document.metadata.get("season", "")
+            race = self._sanitize_text(result.document.metadata.get("race", "Race") or "Race")
+            season = result.document.metadata.get("season", "")  # season is int, no sanitization
             desc = f"[Race Control] {race} {season}"
             if desc not in sources:
                 sources.append(desc)

@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 if TYPE_CHECKING:
+    from sentence_transformers import CrossEncoder
+
     from .vectorstore import SearchResult
 
 console = Console()
@@ -38,7 +40,7 @@ class CrossEncoderReranker:
         self.model_name = model_name or self.MODEL_NAME
         self._model = None  # Lazy load to avoid slow startup
 
-    def _get_model(self):
+    def _get_model(self) -> "CrossEncoder":
         """Lazy load the cross-encoder model."""
         if self._model is None:
             try:
@@ -81,16 +83,15 @@ class CrossEncoderReranker:
         # Create query-document pairs for the cross-encoder
         pairs = [(query, result.document.content) for result in results]
 
-        print(f"DEBUG: Input Results DocIDs: {[r.document.doc_id for r in results]}")
+        logger.debug(f"Input Results DocIDs: {[r.document.doc_id for r in results]}")
 
         # Get cross-encoder scores
         scores = model.predict(pairs)
-        print(f"DEBUG: Model Scores: {scores}")
+        logger.debug(f"Model Scores: {scores}")
 
         # Create new results with updated scores
         reranked = []
         for result, new_score in zip(results, scores):
-            print(f"DEBUG: Processed {result.document.doc_id} with new score {new_score}")
             # Create a new SearchResult with the cross-encoder score
             # Import here to avoid circular dependency
             from .qdrant_store import Document

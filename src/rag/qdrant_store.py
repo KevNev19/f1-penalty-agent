@@ -7,12 +7,20 @@ as the previous Pinecone store for seamless switching between backends.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+
 console = Console()
 logger = logging.getLogger(__name__)
+
+# Constants
+EMBEDDING_BATCH_SIZE = 20
+MAX_EMBEDDING_RETRIES = 3
+EMBEDDING_DIMENSION = 768
 
 
 @dataclass
@@ -45,7 +53,7 @@ class GeminiEmbeddingFunction:
     def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text."""
         embeddings = self._embed_texts([text], task_type="RETRIEVAL_QUERY")
-        return embeddings[0] if embeddings else [0.0] * 768
+        return embeddings[0] if embeddings else [0.0] * EMBEDDING_DIMENSION
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple documents."""
@@ -58,11 +66,8 @@ class GeminiEmbeddingFunction:
         api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
         embeddings = []
 
-        batch_size = 20
-        max_retries = 3
-
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i : i + batch_size]
+        for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+            batch_texts = texts[i : i + EMBEDDING_BATCH_SIZE]
 
             requests_payload = []
             for text in batch_texts:
@@ -77,7 +82,7 @@ class GeminiEmbeddingFunction:
 
             payload = {"requests": requests_payload}
 
-            for attempt in range(max_retries):
+            for attempt in range(MAX_EMBEDDING_RETRIES):
                 try:
                     response = requests.post(api_url, json=payload, timeout=30)
 
@@ -85,22 +90,22 @@ class GeminiEmbeddingFunction:
                         data = response.json()
                         if "embeddings" in data:
                             for emb in data["embeddings"]:
-                                embeddings.append(emb.get("values", [0.0] * 768))
+                                embeddings.append(emb.get("values", [0.0] * EMBEDDING_DIMENSION))
                         else:
-                            embeddings.extend([[0.0] * 768] * len(batch_texts))
+                            embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
                         break
                     elif response.status_code == 429:
                         wait_time = 2**attempt
                         console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
                         time.sleep(wait_time)
                     else:
-                        if attempt == max_retries - 1:
-                            embeddings.extend([[0.0] * 768] * len(batch_texts))
+                        if attempt == MAX_EMBEDDING_RETRIES - 1:
+                            embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
                         time.sleep(1)
                 except Exception as e:
                     logger.warning(f"Embedding request failed: {e}")
-                    if attempt == max_retries - 1:
-                        embeddings.extend([[0.0] * 768] * len(batch_texts))
+                    if attempt == MAX_EMBEDDING_RETRIES - 1:
+                        embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
                     time.sleep(1)
 
         return embeddings
@@ -144,7 +149,7 @@ class QdrantVectorStore:
         self._client = None
         self._embedding_fn = GeminiEmbeddingFunction(embedding_api_key)
 
-    def _get_client(self):
+    def _get_client(self) -> "QdrantClient":
         """Get or create Qdrant client connection."""
         if self._client is None:
             from qdrant_client import QdrantClient
@@ -197,8 +202,8 @@ class QdrantVectorStore:
             try:
                 client.delete_collection(collection_name=collection_name)
                 console.print(f"  [dim]Deleted collection: {collection_name}[/]")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Collection {collection_name} deletion skipped: {e}")
 
         # Recreate collections
         self._ensure_collections()
