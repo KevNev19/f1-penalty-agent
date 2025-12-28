@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
-from ..common.utils import normalize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
@@ -25,12 +24,6 @@ class RetrievalContext:
     stewards_decisions: list[SearchResult]
     race_data: list[SearchResult]
     query: str
-
-    @staticmethod
-    def _sanitize_text(text: str) -> str:
-        """Normalize text for safe use in prompts and metadata."""
-
-        return normalize_text(text)
 
     def get_combined_context(self, max_chars: int = 8000) -> str:
         """Get combined context string for the LLM.
@@ -50,8 +43,8 @@ class RetrievalContext:
             for result in self.regulations:
                 if char_count > max_chars:
                     break
-                content = self._sanitize_text(result.document.content)
-                source = self._sanitize_text(result.document.metadata.get("source", "Unknown"))
+                content = result.document.content or ""
+                source = result.document.metadata.get("source", "Unknown") or ""
                 parts.append(f"\n[Source: {source}]\n{content}")
                 char_count += len(content)
 
@@ -61,8 +54,8 @@ class RetrievalContext:
             for result in self.stewards_decisions:
                 if char_count > max_chars:
                     break
-                content = self._sanitize_text(result.document.content)
-                event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
+                content = result.document.content or ""
+                event = result.document.metadata.get("event", "Unknown") or ""
                 parts.append(f"\n[Event: {event}]\n{content}")
                 char_count += len(content)
 
@@ -72,7 +65,7 @@ class RetrievalContext:
             for result in self.race_data:
                 if char_count > max_chars:
                     break
-                content = self._sanitize_text(result.document.content)
+                content = result.document.content or ""
                 parts.append(f"\n{content}")
                 char_count += len(content)
 
