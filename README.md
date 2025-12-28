@@ -53,7 +53,10 @@ poetry run uvicorn src.api.main:app --reload
 # Check status of knowledge base
 poetry run f1agent status
 
-# Setup/index sample data
+# Setup/index all 2025 data (default)
+poetry run f1agent setup
+
+# Setup with limited data (for testing)
 poetry run f1agent setup --limit 3
 
 # Ask a question
@@ -116,7 +119,8 @@ f1-penalty-agent/
 │   ├── agent/          # F1Agent logic
 │   ├── llm/            # Gemini client
 │   ├── interface/      # CLI
-│   └── data/           # FIA scraper, FastF1 loader
+│   ├── common/         # Shared utilities (sanitize_text, chunk_text)
+│   └── data/           # FIA scraper, FastF1 loader, Jolpica client
 ├── infra/terraform/    # GCP infrastructure as code
 ├── tests/              # Unit + integration tests
 └── Dockerfile          # Production container

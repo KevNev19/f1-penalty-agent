@@ -105,6 +105,13 @@ poetry run ruff format src/ tests/ --check
 - **Keyword boosting**: Exact match scoring
 - **Deduplication**: Removes redundant results
 
+### Common Utilities (`src/common/utils.py`)
+
+Shared helper functions used across CLI, API, and LLM:
+
+- **`sanitize_text(text)`**: Removes BOM and non-ASCII characters for API-safe text
+- **`chunk_text(text, chunk_size, overlap)`**: Splits text into overlapping chunks (1500 chars, 200 overlap) for better vector search
+
 ### FastAPI Backend (`src/api/`)
 
 | Endpoint | Method | Description |
