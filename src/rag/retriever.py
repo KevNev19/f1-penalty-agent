@@ -194,58 +194,6 @@ class F1Retriever:
 
         return deduplicated
 
-    def chunk_text(
-        self,
-        text: str,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 200,
-    ) -> list[str]:
-        """Split text into overlapping chunks.
-
-        Args:
-            text: Text to chunk.
-            chunk_size: Target size of each chunk (must be positive).
-            chunk_overlap: Overlap between consecutive chunks (must be less than chunk_size).
-
-        Returns:
-            List of text chunks.
-
-        Raises:
-            ValueError: If chunk_overlap >= chunk_size or parameters are invalid.
-        """
-        if chunk_size <= 0:
-            raise ValueError("chunk_size must be positive")
-        if chunk_overlap < 0:
-            raise ValueError("chunk_overlap must be non-negative")
-        if chunk_overlap >= chunk_size:
-            raise ValueError("chunk_overlap must be less than chunk_size to avoid infinite loop")
-
-        if len(text) <= chunk_size:
-            return [text]
-
-        chunks = []
-        start = 0
-
-        while start < len(text):
-            end = start + chunk_size
-
-            # Try to break at sentence boundary
-            if end < len(text):
-                # Look for sentence-ending punctuation
-                for punct in [". ", ".\n", "? ", "?\n", "! ", "!\n"]:
-                    last_punct = text.rfind(punct, start, end)
-                    if last_punct > start + chunk_size // 2:
-                        end = last_punct + 1
-                        break
-
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-
-            start = end - chunk_overlap
-
-        return chunks
-
     def index_fia_document(
         self,
         document: FIADocument,
@@ -267,7 +215,7 @@ class F1Retriever:
             return 0
 
         # Chunk the document
-        chunks = self.chunk_text(document.text_content, chunk_size, chunk_overlap)
+        chunks = chunk_text(document.text_content, chunk_size, chunk_overlap)
 
         # Create Document objects with metadata
         # Use hash of full title + URL to avoid ID collisions
