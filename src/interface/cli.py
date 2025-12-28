@@ -1,4 +1,4 @@
-"""CLI interface for the F1 Penalty Agent."""
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -6,7 +6,9 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from ..common.utils import chunk_text, normalize_text
+from ..application.services.ask_question import AskQuestionService
+from ..common.utils import chunk_text
+from ..composition.container import get_ask_service
 
 app = typer.Typer(
     name="f1agent",
@@ -18,13 +20,9 @@ app = typer.Typer(
 console = Console(force_terminal=True, legacy_windows=False)
 
 
-def get_agent():
-    """Get or create the F1 agent instance."""
-    from ..agent.f1_agent import F1Agent
+def get_service() -> AskQuestionService:
+    """Get or create the AskQuestionService instance."""
     from ..config import settings
-    from ..llm.gemini_client import GeminiClient
-    from ..rag.qdrant_store import QdrantVectorStore
-    from ..rag.retriever import F1Retriever
 
     settings.ensure_directories()
 
@@ -42,15 +40,7 @@ def get_agent():
         )
         raise typer.Exit(1)
 
-    vector_store = QdrantVectorStore(
-        url=settings.qdrant_url,
-        api_key=settings.qdrant_api_key,
-        embedding_api_key=settings.google_api_key,
-    )
-    retriever = F1Retriever(vector_store, use_reranker=False)  # Disable for CLI (slow startup)
-    llm = GeminiClient(settings.google_api_key, settings.llm_model)
-
-    return F1Agent(llm, retriever)
+    return get_ask_service()
 
 
 @app.command()
@@ -71,8 +61,8 @@ def chat():
     )
 
     try:
-        agent = get_agent()
-    except Exception as e:
+        service = get_service()
+    except Exception as e:  # noqa: BLE001
         console.print(f"[red]Failed to initialize agent: {e}[/]")
         raise typer.Exit(1)
 
@@ -88,26 +78,26 @@ def chat():
                 continue
 
             with console.status("[bold green]Thinking...[/]"):
-                response = agent.ask(query)
+                response = service.ask(query)
 
             console.print()
             console.print(
                 Panel(
-                    Markdown(response.answer),
+                    Markdown(response.text),
                     title="[bold red]F1 Agent[/]",
                     border_style="red",
                 )
             )
 
-            if response.sources_used:
+            if response.sources:
                 console.print("[dim]Sources used:[/]")
-                for source in response.sources_used[:3]:
-                    console.print(f"  [dim]{source}[/]")
+                for source in response.sources[:3]:
+                    console.print(f"  [dim]{source.title}[/]")
 
         except KeyboardInterrupt:
             console.print("\n[dim]Goodbye! 🏁[/]")
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             console.print(f"[red]Error: {e}[/]")
 
 
@@ -117,20 +107,20 @@ def ask(
 ):
     """Ask a single question and get an answer."""
     try:
-        agent = get_agent()
-    except Exception as e:
+        service = get_service()
+    except Exception as e:  # noqa: BLE001
         console.print(f"[red]Failed to initialize agent: {e}[/]")
         raise typer.Exit(1)
 
     with console.status("[bold green]Thinking...[/]"):
-        response = agent.ask(question)
+        response = service.ask(question)
 
-    console.print(Markdown(response.answer))
+    console.print(Markdown(response.text))
 
-    if response.sources_used:
+    if response.sources:
         console.print("\n[dim]Sources:[/]")
-        for source in response.sources_used[:3]:
-            console.print(f"  [dim]{source}[/]")
+        for source in response.sources[:3]:
+            console.print(f"  [dim]{source.title}[/]")
 
 
 @app.command()
@@ -176,7 +166,7 @@ def status():
             )
         else:
             console.print(f"\n[green]Total: {total} indexed documents[/]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         console.print(f"[red]Error connecting to Qdrant: {e}[/]")
 
 
@@ -194,195 +184,67 @@ def setup(
     Use --limit 0 (default) to index ALL available data.
     Use --limit N to index only N races worth of data.
     """
-    from pathlib import Path
-
     from ..config import settings
     from ..data.fastf1_loader import FastF1Loader
-    from ..data.fia_scraper import FIAScraper
-    from ..rag.qdrant_store import Document, QdrantVectorStore
+    from ..data.fia_scraper import FIADocument, FIAScraper
+    from ..rag.qdrant_store import QdrantVectorStore
+    from ..rag.retriever import F1Retriever
 
-    console.print("[bold]F1 Penalty Agent Setup[/]\n")
+    settings.ensure_directories()
 
-    # Check credentials
     if not settings.google_api_key:
-        console.print("[red]Error: GOOGLE_API_KEY not set in .env[/]")
+        console.print("[red]Error:[/] GOOGLE_API_KEY not set in environment.")
         raise typer.Exit(1)
 
-    if not settings.qdrant_url or not settings.qdrant_api_key:
-        console.print("[red]Error: QDRANT_URL and QDRANT_API_KEY not set in .env[/]")
-        raise typer.Exit(1)
+    # Initialize vector store and retriever
+    vector_store = QdrantVectorStore(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+        embedding_api_key=settings.google_api_key,
+    )
+    retriever = F1Retriever(vector_store, use_reranker=False)
 
-    console.print("[green]OK[/] Credentials configured")
-    limit_str = "all" if limit == 0 else str(limit)
-    console.print(f"[dim]Indexing data for {season} season (races: {limit_str})...[/]\n")
+    if reset:
+        console.print("[yellow]Resetting collections...[/]")
+        vector_store.reset_collections()
 
-    try:
-        vector_store = QdrantVectorStore(
-            url=settings.qdrant_url,
-            api_key=settings.qdrant_api_key,
-            embedding_api_key=settings.google_api_key,
+    console.print("[green]Downloading FIA documents and stewards decisions...[/]")
+    scraper = FIAScraper(data_dir=Path(settings.data_dir))
+    fia_docs: list[FIADocument] = scraper.fetch_documents(limit=limit, season=season)
+
+    total_indexed = 0
+    for doc in fia_docs:
+        indexed = retriever.index_fia_document(doc)
+        total_indexed += indexed
+        console.print(f"Indexed {indexed} chunks from {doc.title}")
+
+    console.print("[green]Loading race control messages...[/]")
+    f1_loader = FastF1Loader(data_dir=Path(settings.data_dir))
+    penalty_events = f1_loader.load_penalty_events(limit=limit, season=season)
+
+    for event in penalty_events:
+        retriever.index_penalty_event(event)
+
+    console.print(
+        Panel.fit(
+            f"[bold green]Setup complete![/]\nIndexed {total_indexed} regulation/stewards chunks\n"
+            f"Loaded {len(penalty_events)} race control events",
+            title="Success",
+            border_style="green",
         )
-
-        if reset:
-            console.print("[yellow]Resetting collections...[/]")
-            vector_store.reset()
-
-        # Set up data directories
-        data_dir = Path(settings.data_dir)
-        cache_dir = data_dir / "fastf1_cache"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-
-        counts = {"regulations": 0, "stewards_decisions": 0, "race_data": 0}
-
-        # --- 1. Index FIA Regulations ---
-        console.print("[bold]Scraping FIA regulations...[/]")
-        try:
-            scraper = FIAScraper(data_dir)
-            regulations = scraper.scrape_regulations(season)
-            # Apply limit: 0 means all, otherwise limit*2 regulations
-            regs_to_process = regulations if limit == 0 else regulations[: limit * 2]
-
-            reg_docs = []
-            for reg in regs_to_process:
-                with console.status(f"[dim]Downloading {reg.title[:40]}...[/]"):
-                    scraper.download_document(reg)
-                    scraper.extract_text(reg)
-                    if reg.text_content:
-                        # Normalize text to remove BOM and clean whitespace
-                        clean_text = normalize_text(reg.text_content)
-                        # Chunk long documents for better search
-                        chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-                        for i, chunk in enumerate(chunks):
-                            reg_docs.append(
-                                Document(
-                                    doc_id=f"reg-{hash(reg.url) % 10000}-{i}",
-                                    content=chunk,
-                                    metadata={
-                                        "source": normalize_text(reg.title),
-                                        "type": "regulation",
-                                        "url": reg.url,
-                                        "season": season,
-                                        "chunk_index": i,
-                                        "total_chunks": len(chunks),
-                                    },
-                                )
-                            )
-
-            if reg_docs:
-                vector_store.add_documents(reg_docs, collection_name="regulations")
-                counts["regulations"] = len(reg_docs)
-            console.print(f"  [green]+{counts['regulations']}[/] regulations indexed")
-        except Exception as e:
-            console.print(f"  [yellow]Warning: {e}[/]")
-
-        # --- 2. Index Stewards Decisions ---
-        console.print("[bold]Scraping stewards decisions...[/]")
-        try:
-            decisions = scraper.scrape_stewards_decisions(season)
-            # Apply limit: 0 means all, otherwise limit*5 decisions
-            decs_to_process = decisions if limit == 0 else decisions[: limit * 5]
-
-            dec_docs = []
-            for dec in decs_to_process:
-                with console.status(f"[dim]Downloading {dec.title[:40]}...[/]"):
-                    scraper.download_document(dec)
-                    scraper.extract_text(dec)
-                    if dec.text_content:
-                        # Normalize and chunk stewards decisions
-                        clean_text = normalize_text(dec.text_content)
-                        chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-                        for i, chunk in enumerate(chunks):
-                            dec_docs.append(
-                                Document(
-                                    doc_id=f"dec-{hash(dec.url) % 10000}-{i}",
-                                    content=chunk,
-                                    metadata={
-                                        "source": normalize_text(dec.title),
-                                        "type": "stewards_decision",
-                                        "event": normalize_text(dec.event_name or ""),
-                                        "url": dec.url,
-                                        "season": season,
-                                        "chunk_index": i,
-                                    },
-                                )
-                            )
-
-            if dec_docs:
-                vector_store.add_documents(dec_docs, collection_name="stewards_decisions")
-                counts["stewards_decisions"] = len(dec_docs)
-            console.print(f"  [green]+{counts['stewards_decisions']}[/] stewards decisions indexed")
-        except Exception as e:
-            console.print(f"  [yellow]Warning: {e}[/]")
-
-        # --- 3. Index Race Data (penalties from FastF1) ---
-        console.print("[bold]Loading race control data...[/]")
-        try:
-            loader = FastF1Loader(cache_dir)
-            events = loader.get_season_events(season)
-            # Apply limit: 0 means all races, otherwise limit races
-            events_to_process = events if limit == 0 else events[:limit]
-
-            # Load Jolpica for driver context
-            from ..data.jolpica_client import JolpicaClient
-
-            jolpica = JolpicaClient()
-            drivers = jolpica.get_drivers(season)
-            driver_map = {d.code: d.name for d in drivers}
-            driver_map.update({str(d.number): d.name for d in drivers if d.number})
-
-            race_docs = []
-            for event in events_to_process:
-                with console.status(f"[dim]Loading {event}...[/]"):
-                    try:
-                        penalties = loader.get_race_control_messages(season, event, "Race")
-                        for penalty in penalties:
-                            if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
-                                # Resolve driver name using Jolpica data
-                                driver_name = penalty.driver
-                                if driver_name and driver_name in driver_map:
-                                    driver_name = driver_map[driver_name]
-
-                                content = normalize_text(
-                                    f"Race: {penalty.race_name} ({penalty.session})\n"
-                                    f"Driver: {driver_name or 'Unknown'}\n"
-                                    f"Message: {penalty.message}\n"
-                                    f"Category: {penalty.category}"
-                                )
-                                race_docs.append(
-                                    Document(
-                                        doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
-                                        content=content,
-                                        metadata={
-                                            "source": normalize_text(
-                                                f"{penalty.race_name} {penalty.session}"
-                                            ),
-                                            "type": "race_control",
-                                            "driver": normalize_text(driver_name or ""),
-                                            "race": normalize_text(penalty.race_name),
-                                            "season": season,
-                                        },
-                                    )
-                                )
-                    except Exception as e:
-                        console.print(f"  [dim]Skipped {event}: {e}[/]")
-                        continue
-
-            if race_docs:
-                vector_store.add_documents(race_docs, collection_name="race_data")
-                counts["race_data"] = len(race_docs)
-            console.print(f"  [green]+{counts['race_data']}[/] race control messages indexed")
-        except Exception as e:
-            console.print(f"  [yellow]Warning: {e}[/]")
-
-        total = sum(counts.values())
-        console.print(f"\n[green bold]Setup complete! Indexed {total} documents.[/]")
-        console.print("[dim]Run 'f1agent ask \"What is the penalty for track limits?\"' to test[/]")
-
-    except Exception as e:
-        console.print(f"[red]Error during setup: {e}[/]")
-        raise typer.Exit(1)
+    )
 
 
-if __name__ == "__main__":
-    app()
+@app.command()
+def chunk(
+    path: Path = typer.Argument(..., help="Path to a text file to chunk"),
+    chunk_size: int = typer.Option(1000, help="Size of each chunk"),
+    chunk_overlap: int = typer.Option(200, help="Overlap between chunks"),
+):
+    """Chunk a text file and display the chunks."""
+    content = path.read_text(encoding="utf-8")
+    chunks = chunk_text(content, chunk_size, chunk_overlap)
+
+    console.print(f"[bold]Generated {len(chunks)} chunks:[/]")
+    for i, chunk in enumerate(chunks, 1):
+        console.print(Panel.fit(chunk, title=f"Chunk {i}"))

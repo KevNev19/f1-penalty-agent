@@ -1,5 +1,6 @@
 """Integration tests for FastAPI endpoints."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,18 +8,18 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def mock_agent():
-    """Mock the F1Agent for testing."""
+def mock_ask_service():
+    """Mock the AskQuestionService for testing."""
     mock = MagicMock()
     mock_response = MagicMock()
-    mock_response.answer = "Test penalty answer"
-    mock_response.sources_used = [
-        {
-            "source": "FIA Regulations",
-            "doc_type": "regulation",
-            "score": 0.85,
-            "excerpt": "Track limits...",
-        }
+    mock_response.text = "Test penalty answer"
+    mock_response.sources = [
+        SimpleNamespace(
+            title="FIA Regulations",
+            doc_type="regulation",
+            relevance_score=0.85,
+            excerpt="Track limits...",
+        )
     ]
     mock_response.model_used = "gemini-2.0-flash"
     mock.ask.return_value = mock_response
@@ -35,13 +36,13 @@ def mock_vector_store():
 
 
 @pytest.fixture
-def client(mock_agent, mock_vector_store):
+def client(mock_ask_service, mock_vector_store):
     """Create test client with mocked dependencies."""
     with (
-        patch("src.api.routers.chat.get_agent") as mock_get_agent,
+        patch("src.api.routers.chat.get_question_service") as mock_get_service,
         patch("src.api.routers.health.get_vector_store") as mock_get_vs,
     ):
-        mock_get_agent.return_value = mock_agent
+        mock_get_service.return_value = mock_ask_service
         mock_get_vs.return_value = mock_vector_store
 
         from src.api.main import app
