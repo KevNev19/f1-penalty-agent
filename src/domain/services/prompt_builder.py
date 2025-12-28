@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from ..models import QueryType, RetrievalContext
 from ...agent.prompts import (
     F1_SYSTEM_PROMPT,
     GENERAL_F1_PROMPT,
     PENALTY_EXPLANATION_PROMPT,
     RULE_LOOKUP_PROMPT,
 )
+from ..models import QueryType, RetrievalContext
 
 
 class PromptBuilder:
