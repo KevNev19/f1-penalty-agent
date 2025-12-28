@@ -161,7 +161,9 @@ class F1Agent:
 
         for result in context.stewards_decisions[:3]:
             event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
-            source = self._sanitize_text(result.document.metadata.get("source", "Stewards Decision"))
+            source = self._sanitize_text(
+                result.document.metadata.get("source", "Stewards Decision")
+            )
             desc = f"[Stewards] {source} ({event})"
             if desc not in sources:
                 sources.append(desc)
