@@ -110,23 +110,23 @@ steps:
         sleep 15
 
         # Get the service URL
-        SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
+        SERVICE_URL=$$(gcloud run services describe ${_SERVICE_NAME} \
           --region=${_DEPLOY_REGION} \
           --format='value(status.url)')
 
-        echo "Service URL: $SERVICE_URL"
+        echo "Service URL: $$SERVICE_URL"
 
         # Health check with retries
         for i in 1 2 3; do
-          echo "Health check attempt $i..."
-          if curl -sf "$SERVICE_URL/health" > /dev/null; then
-            echo "✅ Health check passed!"
+          echo "Health check attempt $$i..."
+          if curl -sf "$$SERVICE_URL/health" > /dev/null; then
+            echo "Health check passed!"
             exit 0
           fi
           sleep 5
         done
 
-        echo "❌ Health check failed after 3 attempts"
+        echo "Health check failed after 3 attempts"
         exit 1
     waitFor: ["deploy"]
 
