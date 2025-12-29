@@ -96,7 +96,7 @@ class GeminiEmbeddingFunction:
                         break
                     elif response.status_code == 429:
                         wait_time = 2**attempt
-                        console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
+                        logger.warning("Rate limit hit, retrying in %ds...", wait_time)
                         time.sleep(wait_time)
                     else:
                         if attempt == MAX_EMBEDDING_RETRIES - 1:
@@ -158,7 +158,7 @@ class QdrantVectorStore:
                 url=self.url,
                 api_key=self.api_key,
             )
-            console.print(f"[green]Connected to Qdrant at: {self.url}[/]")
+            logger.info("Connected to Qdrant at: %s", self.url)
 
             # Ensure collections exist
             self._ensure_collections()
@@ -186,7 +186,7 @@ class QdrantVectorStore:
                             distance=Distance.COSINE,
                         ),
                     )
-                    console.print(f"  [dim]Created collection: {collection_name}[/]")
+                    logger.debug("Created collection: %s", collection_name)
             except Exception as e:
                 logger.warning(f"Could not ensure collection {collection_name}: {e}")
 
@@ -201,13 +201,13 @@ class QdrantVectorStore:
         ]:
             try:
                 client.delete_collection(collection_name=collection_name)
-                console.print(f"  [dim]Deleted collection: {collection_name}[/]")
+                logger.debug("Deleted collection: %s", collection_name)
             except Exception as e:
                 logger.debug(f"Collection {collection_name} deletion skipped: {e}")
 
         # Recreate collections
         self._ensure_collections()
-        console.print("[yellow]Qdrant vector store reset complete[/]")
+        logger.info("Qdrant vector store reset complete")
 
     def add_documents(
         self,
@@ -232,7 +232,7 @@ class QdrantVectorStore:
 
         # Generate embeddings
         contents = [doc.content for doc in documents]
-        console.print(f"[blue]Generating embeddings for {len(documents)} documents...[/]")
+        logger.debug("Generating embeddings for %d documents...", len(documents))
         embeddings = self._embedding_fn.embed_documents(contents)
 
         # Prepare points for upsert
@@ -269,7 +269,7 @@ class QdrantVectorStore:
                 points=batch,
             )
 
-        console.print(f"[green]Added {len(documents)} documents to {collection_name}[/]")
+        logger.info("Added %d documents to %s", len(documents), collection_name)
         return len(documents)
 
     def search(
@@ -425,6 +425,6 @@ class QdrantVectorStore:
                     distance=Distance.COSINE,
                 ),
             )
-            console.print(f"[yellow]Cleared collection: {collection_name}[/]")
+            logger.info("Cleared collection: %s", collection_name)
         except Exception as e:
             logger.warning(f"Failed to clear collection {collection_name}: {e}")

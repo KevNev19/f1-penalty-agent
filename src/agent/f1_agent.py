@@ -1,5 +1,6 @@
 """F1 Penalty Agent - main agent orchestration."""
 
+import logging
 import re
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from .prompts import (
 )
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class QueryType(Enum):
@@ -193,25 +195,27 @@ class F1Agent:
         if not query or not query.strip():
             raise ValueError("Query cannot be empty or whitespace only")
 
-        console.print("[dim]Analyzing question...[/]")
+        # Use logger instead of console.print to avoid ASCII encoding issues
+        # in Cloud Run where stdout may have limited encoding support
+        logger.debug("Analyzing question...")
 
         # Classify the query
         query_type = self.classify_query(query)
-        console.print(f"[dim]Query type: {query_type.value}[/]")
+        logger.debug("Query type: %s", query_type.value)
 
         # Extract context hints (driver, race, etc.)
         query_context = self.retriever.extract_race_context(query)
-        console.print(f"[dim]Detected context: {query_context}[/]")
+        logger.debug("Detected context: %s", query_context)
 
         # Retrieve relevant documents
-        console.print("[dim]Searching knowledge base...[/]")
+        logger.debug("Searching knowledge base...")
         context = self.retriever.retrieve(query, top_k=5, query_context=query_context)
 
         # Build prompt
         prompt = self.build_prompt(query, query_type, context)
 
         # Generate response
-        console.print("[dim]Generating response...[/]")
+        logger.debug("Generating response...")
         answer = self.llm.generate(prompt, system_prompt=F1_SYSTEM_PROMPT)
 
         # Get sources
