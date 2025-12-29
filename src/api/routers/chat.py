@@ -1,6 +1,7 @@
 """Chat endpoint for asking F1 penalty questions."""
 
 import logging
+import traceback
 
 from fastapi import APIRouter, HTTPException
 
@@ -75,6 +76,9 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
         )
 
     except ValueError as e:
+        # Capture full traceback to identify BOM error source
+        tb = traceback.format_exc()
+        logger.error(f"ValueError traceback:\n{tb}")
         # Sanitize error message to remove BOM and non-ASCII chars
         error_msg = normalize_text(str(e)) or "Invalid request"
         logger.warning(f"Invalid request: {error_msg}")
@@ -83,6 +87,9 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             detail=error_msg,
         )
     except Exception as e:
+        # Capture full traceback to identify BOM error source
+        tb = traceback.format_exc()
+        logger.error(f"Exception traceback:\n{tb}")
         # Sanitize error message for logging
         error_msg = normalize_text(str(e))
         logger.exception(f"Error processing question: {error_msg}")
