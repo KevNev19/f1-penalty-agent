@@ -40,7 +40,7 @@
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.12+ (a `.python-version` file pins 3.12.12 for pyenv users)
 - Poetry
 - Google AI API key
 - Qdrant Cloud account (free tier)
