@@ -5,6 +5,7 @@
 # 2. Test (run tests with dependencies)
 # 3. Build Docker image
 # 4. Push and Deploy
+# 5. Verify deployment health
 
 steps:
   # ============================================================
@@ -31,7 +32,7 @@ steps:
       - |
         pip install -q poetry
         poetry config virtualenvs.create false
-        poetry install --only main,dev --no-interaction
+        poetry install --only main,dev --no-interaction --no-root
         pytest tests/ -v --tb=short -x
     waitFor: ["lint"]
 
@@ -50,7 +51,7 @@ steps:
     waitFor: ["test"]
 
   # ============================================================
-  # Stage 4: Push and Deploy (only if tests pass)
+  # Stage 4: Push to Artifact Registry
   # ============================================================
   - name: "gcr.io/cloud-builders/docker"
     id: "push"
@@ -60,6 +61,9 @@ steps:
       - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}"
     waitFor: ["build"]
 
+  # ============================================================
+  # Stage 5: Deploy to Cloud Run
+  # ============================================================
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "deploy"
     entrypoint: gcloud
@@ -87,9 +91,44 @@ steps:
       - "512Mi"
       - "--timeout"
       - "300"
+      - "--set-env-vars"
+      - "PYTHONIOENCODING=utf-8,PYTHONUTF8=1,LANG=C.UTF-8,LC_ALL=C.UTF-8"
       - "--set-secrets"
       - "GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest"
     waitFor: ["push"]
+
+  # ============================================================
+  # Stage 6: Verify deployment health
+  # ============================================================
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "verify"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        echo "Waiting for deployment to stabilize..."
+        sleep 15
+
+        # Get the service URL
+        SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
+          --region=${_DEPLOY_REGION} \
+          --format='value(status.url)')
+
+        echo "Service URL: $SERVICE_URL"
+
+        # Health check with retries
+        for i in 1 2 3; do
+          echo "Health check attempt $i..."
+          if curl -sf "$SERVICE_URL/health" > /dev/null; then
+            echo "✅ Health check passed!"
+            exit 0
+          fi
+          sleep 5
+        done
+
+        echo "❌ Health check failed after 3 attempts"
+        exit 1
+    waitFor: ["deploy"]
 
 # Store image in Artifact Registry
 images:
