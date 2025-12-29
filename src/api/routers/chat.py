@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from ...common.utils import normalize_text
-from ..deps import get_agent
+from ..deps import get_question_service
 from ..models import AnswerResponse, ErrorResponse, QuestionRequest, SourceInfo
 
 logger = logging.getLogger(__name__)
@@ -22,68 +22,41 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
     },
 )
 async def ask_question(request: QuestionRequest) -> AnswerResponse:
-    """Ask a question about F1 penalties or regulations.
+    """Ask a question about F1 penalties or regulations."""
 
-    Args:
-        request: The question request containing the user's question.
-
-    Returns:
-        AnswerResponse with the AI-generated answer and sources.
-
-    Raises:
-        HTTPException: If the question cannot be processed.
-    """
     try:
-        agent = get_agent()
+        ask_service = get_question_service()
         normalized_question = normalize_text(request.question)
 
-        # Get response from the agent
-        response = agent.ask(normalized_question)
+        response = ask_service.ask(normalized_question)
 
-        # Convert sources to SourceInfo objects
-        # Sanitize ALL text fields to prevent BOM encoding errors in JSON response
-        sources = []
-        for source in response.sources_used:
-            # Handle both string and dict formats
-            if isinstance(source, str):
-                sources.append(
-                    SourceInfo(
-                        title=normalize_text(source.replace("[Source] ", "")),
-                        doc_type="regulation",
-                        relevance_score=0.0,
-                        excerpt=None,
-                    )
-                )
-            else:
-                sources.append(
-                    SourceInfo(
-                        title=normalize_text(source.get("source", "Unknown")),
-                        doc_type=normalize_text(source.get("doc_type", "unknown")),
-                        relevance_score=source.get("score", 0.0),
-                        excerpt=normalize_text(source.get("excerpt") or ""),
-                    )
-                )
+        sources = [
+            SourceInfo(
+                title=normalize_text(source.title),
+                doc_type=normalize_text(source.doc_type),
+                relevance_score=source.relevance_score or 0.0,
+                excerpt=normalize_text(source.excerpt or ""),
+            )
+            for source in response.sources
+        ]
 
-        # Sanitize the answer to remove any BOM or non-ASCII characters
-        clean_answer = normalize_text(response.answer)
+        clean_answer = normalize_text(response.text)
 
         return AnswerResponse(
             answer=clean_answer,
             sources=sources,
             question=normalized_question,
-            model_used="gemini-2.0-flash",
+            model_used=response.model_used or "gemini-2.0-flash",
         )
 
     except ValueError as e:
-        # Sanitize error message to remove BOM and non-ASCII chars
         error_msg = normalize_text(str(e)) or "Invalid request"
         logger.warning(f"Invalid request: {error_msg}")
         raise HTTPException(
             status_code=400,
             detail=error_msg,
         )
-    except Exception as e:
-        # Sanitize error message for logging
+    except Exception as e:  # noqa: BLE001
         error_msg = normalize_text(str(e))
         logger.exception(f"Error processing question: {error_msg}")
         raise HTTPException(

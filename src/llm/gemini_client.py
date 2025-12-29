@@ -8,6 +8,7 @@ from rich.console import Console
 if TYPE_CHECKING:
     from google import genai
 
+from ..common.rate_limiter import RateLimiter
 from ..common.utils import normalize_text
 
 console = Console()
@@ -16,15 +17,19 @@ console = Console()
 class GeminiClient:
     """Client for Google Gemini API using the new google-genai SDK."""
 
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash") -> None:
+    def __init__(
+        self, api_key: str, model: str = "gemini-2.0-flash", rate_limiter: RateLimiter | None = None
+    ) -> None:
         """Initialize the Gemini client.
 
         Args:
             api_key: Google AI API key.
             model: Model to use (default: gemini-2.0-flash for free tier).
+            rate_limiter: Optional client-side limiter to throttle requests per minute.
         """
         self.api_key = api_key
         self.model_name = model
+        self.rate_limiter = rate_limiter
         self._client = None
 
     def _get_client(self) -> "genai.Client":
@@ -79,6 +84,8 @@ class GeminiClient:
 
         for attempt in range(max_retries):
             try:
+                if self.rate_limiter:
+                    self.rate_limiter.acquire()
                 response = client.models.generate_content(
                     model=self.model_name,
                     contents=full_prompt,
@@ -142,6 +149,9 @@ class GeminiClient:
 
         try:
             # Use generate_content_stream for streaming
+            if self.rate_limiter:
+                self.rate_limiter.acquire()
+
             for chunk in client.models.generate_content_stream(
                 model=self.model_name,
                 contents=full_prompt,
@@ -168,6 +178,8 @@ class GeminiClient:
         """
         client = self._get_client()
         try:
+            if self.rate_limiter:
+                self.rate_limiter.acquire()
             response = client.models.count_tokens(
                 model=self.model_name,
                 contents=text,

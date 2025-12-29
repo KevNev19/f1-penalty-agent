@@ -14,6 +14,8 @@ from rich.console import Console
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
+from ..common.rate_limiter import RateLimiter
+
 console = Console()
 logger = logging.getLogger(__name__)
 
@@ -46,9 +48,15 @@ class GeminiEmbeddingFunction:
     Shared embedding function for consistent embeddings across the application.
     """
 
-    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "models/text-embedding-004",
+        rate_limiter: RateLimiter | None = None,
+    ):
         self.api_key = api_key
         self.model_name = model_name
+        self.rate_limiter = rate_limiter
 
     def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text."""
@@ -84,6 +92,8 @@ class GeminiEmbeddingFunction:
 
             for attempt in range(MAX_EMBEDDING_RETRIES):
                 try:
+                    if self.rate_limiter:
+                        self.rate_limiter.acquire()
                     response = requests.post(api_url, json=payload, timeout=30)
 
                     if response.status_code == 200:
@@ -136,6 +146,7 @@ class QdrantVectorStore:
         url: str,
         api_key: str,
         embedding_api_key: str,
+        embedding_rate_limiter: RateLimiter | None = None,
     ) -> None:
         """Initialize the Qdrant vector store.
 
@@ -143,11 +154,15 @@ class QdrantVectorStore:
             url: Qdrant Cloud cluster URL.
             api_key: Qdrant API key.
             embedding_api_key: Google API key for embeddings.
+            embedding_rate_limiter: Optional limiter to throttle embedding requests per minute.
         """
         self.url = url
         self.api_key = api_key
         self._client = None
-        self._embedding_fn = GeminiEmbeddingFunction(embedding_api_key)
+        self._embedding_fn = GeminiEmbeddingFunction(
+            embedding_api_key,
+            rate_limiter=embedding_rate_limiter,
+        )
 
     def _get_client(self) -> "QdrantClient":
         """Get or create Qdrant client connection."""
