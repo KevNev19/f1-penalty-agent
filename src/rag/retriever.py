@@ -5,15 +5,13 @@ import logging
 import re
 from dataclasses import dataclass
 
-from rich.console import Console
-
+from ..common.console import console
 from ..common.utils import chunk_text, normalize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
 from .reranker import CrossEncoderReranker
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 

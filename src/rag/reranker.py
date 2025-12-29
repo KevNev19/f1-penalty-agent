@@ -8,14 +8,13 @@ embedding-based similarity alone.
 import logging
 from typing import TYPE_CHECKING
 
-from rich.console import Console
+from ..common.console import console
 
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder
 
     from .vectorstore import SearchResult
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 

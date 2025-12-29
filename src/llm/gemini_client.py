@@ -4,14 +4,11 @@ import logging
 from collections.abc import Generator
 from typing import TYPE_CHECKING
 
-from rich.console import Console
-
 if TYPE_CHECKING:
     from google import genai
 
 from ..common.utils import normalize_text
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 

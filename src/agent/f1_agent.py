@@ -6,8 +6,6 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
 
-from rich.console import Console
-
 from ..common.utils import normalize_text
 from ..llm.gemini_client import GeminiClient
 from ..rag.retriever import F1Retriever, RetrievalContext
@@ -18,7 +16,6 @@ from .prompts import (
     RULE_LOOKUP_PROMPT,
 )
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 

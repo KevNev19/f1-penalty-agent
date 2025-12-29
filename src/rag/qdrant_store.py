@@ -9,12 +9,9 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from rich.console import Console
-
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 # Constants
