@@ -75,6 +75,23 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             model_used="gemini-2.0-flash",
         )
 
+    except UnicodeEncodeError:
+        # Catch encoding errors specifically - these happen when the system
+        # tries to encode Unicode chars to ASCII. This must be BEFORE ValueError
+        # since UnicodeEncodeError is a subclass of ValueError.
+        tb = traceback.format_exc()
+        logger.error(f"UnicodeEncodeError traceback:\n{tb}")
+        raise HTTPException(
+            status_code=500,
+            detail="Text encoding error occurred. Please try a different question.",
+        )
+    except UnicodeDecodeError:
+        tb = traceback.format_exc()
+        logger.error(f"UnicodeDecodeError traceback:\n{tb}")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid text encoding in request.",
+        )
     except ValueError as e:
         # Capture full traceback to identify BOM error source
         tb = traceback.format_exc()
