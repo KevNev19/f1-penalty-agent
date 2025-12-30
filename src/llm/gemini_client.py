@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from google import genai
 
+from ..common.exceptions import LLMConnectionError, MissingAPIKeyError
 from ..common.utils import normalize_text
 
 logger = logging.getLogger(__name__)
@@ -30,15 +31,23 @@ class GeminiClient:
         """Lazy load the Gemini client."""
         if self._client is None:
             if not self.api_key:
-                raise ValueError(
+                raise MissingAPIKeyError(
                     "Google API key not set. Get one at https://aistudio.google.com/ "
-                    "and set GOOGLE_API_KEY in your .env file."
+                    "and set GOOGLE_API_KEY in your .env file.",
+                    context={"key_name": "GOOGLE_API_KEY"},
                 )
 
-            from google import genai
+            try:
+                from google import genai
 
-            self._client = genai.Client(api_key=self.api_key)
-            logger.info("Gemini client initialized for model: %s", self.model_name)
+                self._client = genai.Client(api_key=self.api_key)
+                logger.info("Gemini client initialized for model: %s", self.model_name)
+            except Exception as e:
+                raise LLMConnectionError(
+                    f"Failed to initialize Gemini client for model {self.model_name}",
+                    cause=e,
+                    context={"model": self.model_name},
+                ) from e
 
         return self._client
 
