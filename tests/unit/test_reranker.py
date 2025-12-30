@@ -13,7 +13,7 @@ mock_cross_encoder_class = MagicMock()
 mock_st_module = MagicMock()
 mock_st_module.CrossEncoder = mock_cross_encoder_class
 
-from src.rag.qdrant_store import Document, SearchResult  # noqa: E402
+from src.core.domain import Document, SearchResult  # noqa: E402
 
 
 class TestCrossEncoderReranker:
@@ -65,7 +65,7 @@ class TestCrossEncoderReranker:
         # We need to ensure we re-create the reranker so it picks up the mock
         from importlib import reload
 
-        import src.rag.reranker as reranker_module
+        import src.core.services.reranker as reranker_module
 
         reload(reranker_module)
 
@@ -151,7 +151,7 @@ class TestCrossEncoderReranker:
         """Test that model is loaded lazily on first use."""
         from importlib import reload
 
-        import src.rag.reranker as reranker_module
+        import src.core.services.reranker as reranker_module
 
         reload(reranker_module)
 
@@ -172,7 +172,7 @@ class TestCrossEncoderReranker:
         """Test that default model is MS MARCO MiniLM."""
         from importlib import reload
 
-        import src.rag.reranker as reranker_module
+        import src.core.services.reranker as reranker_module
 
         reload(reranker_module)
 
@@ -190,7 +190,7 @@ class TestCrossEncoderReranker:
         """Test using custom model name."""
         from importlib import reload
 
-        import src.rag.reranker as reranker_module
+        import src.core.services.reranker as reranker_module
 
         reload(reranker_module)
 
