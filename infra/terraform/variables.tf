@@ -46,13 +46,6 @@ variable "deploy_cloud_run" {
   default     = false
 }
 
-# Qdrant Cloud deployment control
-variable "skip_qdrant" {
-  description = "Skip Qdrant Cloud resources (use when API key is unavailable or cluster already exists)"
-  type        = bool
-  default     = false
-}
-
 # GitHub repository for Cloud Build trigger
 variable "github_owner" {
   description = "GitHub repository owner/organization"
