@@ -1,7 +1,6 @@
 """Chat endpoint for asking F1 penalty questions."""
 
 import logging
-import traceback
 
 from fastapi import APIRouter, HTTPException
 
@@ -42,14 +41,12 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
         response = agent.ask(normalized_question)
 
         # Convert sources to SourceInfo objects
-        # Sanitize ALL text fields to prevent BOM encoding errors in JSON response
         sources = []
         for source in response.sources_used:
-            # Handle both string and dict formats
             if isinstance(source, str):
                 sources.append(
                     SourceInfo(
-                        title=normalize_text(source.replace("[Source] ", "")),
+                        title=source.replace("[Source] ", ""),
                         doc_type="regulation",
                         relevance_score=0.0,
                         excerpt=None,
@@ -58,41 +55,25 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
             else:
                 sources.append(
                     SourceInfo(
-                        title=normalize_text(source.get("source", "Unknown")),
-                        doc_type=normalize_text(source.get("doc_type", "unknown")),
+                        title=source.get("source", "Unknown"),
+                        doc_type=source.get("doc_type", "unknown"),
                         relevance_score=source.get("score", 0.0),
-                        excerpt=normalize_text(source.get("excerpt") or ""),
+                        excerpt=source.get("excerpt") or "",
                     )
                 )
 
-        # Sanitize the answer to remove any BOM or non-ASCII characters
-        clean_answer = normalize_text(response.answer)
-
         return AnswerResponse(
-            answer=clean_answer,
+            answer=response.answer,
             sources=sources,
             question=normalized_question,
             model_used="gemini-2.0-flash",
         )
 
     except ValueError as e:
-        # Capture full traceback to identify BOM error source
-        tb = traceback.format_exc()
-        logger.error(f"ValueError traceback:\n{tb}")
-        # Sanitize error message to remove BOM and non-ASCII chars
-        error_msg = normalize_text(str(e)) or "Invalid request"
-        logger.warning(f"Invalid request: {error_msg}")
-        raise HTTPException(
-            status_code=400,
-            detail=error_msg,
-        )
+        logger.warning(f"Invalid request: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Capture full traceback to identify BOM error source
-        tb = traceback.format_exc()
-        logger.error(f"Exception traceback:\n{tb}")
-        # Sanitize error message for logging
-        error_msg = normalize_text(str(e))
-        logger.exception(f"Error processing question: {error_msg}")
+        logger.exception(f"Error processing question: {e}")
         raise HTTPException(
             status_code=500,
             detail="An error occurred while processing your question. Please try again.",
