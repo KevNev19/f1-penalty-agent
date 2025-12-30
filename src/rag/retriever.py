@@ -5,15 +5,12 @@ import logging
 import re
 from dataclasses import dataclass
 
-from rich.console import Console
-
 from ..common.utils import chunk_text, normalize_text
 from ..data.fastf1_loader import PenaltyEvent
 from ..data.fia_scraper import FIADocument
 from .qdrant_store import Document, QdrantVectorStore, SearchResult
 from .reranker import CrossEncoderReranker
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 
@@ -218,7 +215,7 @@ class F1Retriever:
             Number of chunks indexed.
         """
         if not document.text_content:
-            console.print(f"[yellow]No text content in {document.title}[/]")
+            logger.warning(f"No text content in {document.title}")
             return 0
 
         # Chunk the document

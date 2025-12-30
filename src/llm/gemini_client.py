@@ -1,9 +1,8 @@
 """Google Gemini API client for LLM inference using the google-genai SDK."""
 
+import logging
 from collections.abc import Generator
 from typing import TYPE_CHECKING
-
-from rich.console import Console
 
 if TYPE_CHECKING:
     from google import genai
@@ -11,7 +10,7 @@ if TYPE_CHECKING:
 from ..common.rate_limiter import RateLimiter
 from ..common.utils import normalize_text
 
-console = Console()
+logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
@@ -44,7 +43,7 @@ class GeminiClient:
             from google import genai
 
             self._client = genai.Client(api_key=self.api_key)
-            console.print(f"[green]Gemini client initialized for model: {self.model_name}[/]")
+            logger.info("Gemini client initialized for model: %s", self.model_name)
 
         return self._client
 
@@ -106,7 +105,7 @@ class GeminiClient:
                 if "quota" in error_msg or "rate" in error_msg:
                     if attempt < max_retries - 1:
                         wait_time = 2**attempt  # Exponential backoff
-                        console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
+                        logger.warning("Rate limit hit, retrying in %ds...", wait_time)
                         time.sleep(wait_time)
                     else:
                         return (
@@ -114,7 +113,7 @@ class GeminiClient:
                             "Tip: The free tier has limited requests per minute."
                         )
                 else:
-                    console.print(f"[red]Gemini error: {e}[/]")
+                    logger.error("Gemini error: %s", e)
                     raise
 
         return "Failed to generate response after retries."

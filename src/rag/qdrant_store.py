@@ -9,8 +9,6 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from rich.console import Console
-
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
@@ -106,7 +104,7 @@ class GeminiEmbeddingFunction:
                         break
                     elif response.status_code == 429:
                         wait_time = 2**attempt
-                        console.print(f"[yellow]Rate limit hit, retrying in {wait_time}s...[/]")
+                        logger.warning("Rate limit hit, retrying in %ds...", wait_time)
                         time.sleep(wait_time)
                     else:
                         if attempt == MAX_EMBEDDING_RETRIES - 1:
@@ -173,7 +171,7 @@ class QdrantVectorStore:
                 url=self.url,
                 api_key=self.api_key,
             )
-            console.print(f"[green]Connected to Qdrant at: {self.url}[/]")
+            logger.info("Connected to Qdrant at: %s", self.url)
 
             # Ensure collections exist
             self._ensure_collections()
@@ -201,7 +199,7 @@ class QdrantVectorStore:
                             distance=Distance.COSINE,
                         ),
                     )
-                    console.print(f"  [dim]Created collection: {collection_name}[/]")
+                    logger.debug("Created collection: %s", collection_name)
             except Exception as e:
                 logger.warning(f"Could not ensure collection {collection_name}: {e}")
 
@@ -216,13 +214,13 @@ class QdrantVectorStore:
         ]:
             try:
                 client.delete_collection(collection_name=collection_name)
-                console.print(f"  [dim]Deleted collection: {collection_name}[/]")
+                logger.debug("Deleted collection: %s", collection_name)
             except Exception as e:
                 logger.debug(f"Collection {collection_name} deletion skipped: {e}")
 
         # Recreate collections
         self._ensure_collections()
-        console.print("[yellow]Qdrant vector store reset complete[/]")
+        logger.info("Qdrant vector store reset complete")
 
     def add_documents(
         self,
@@ -245,14 +243,14 @@ class QdrantVectorStore:
 
         client = self._get_client()
 
-        # Generate embeddings
-        contents = [doc.content for doc in documents]
-        console.print(f"[blue]Generating embeddings for {len(documents)} documents...[/]")
+        # Normalize content before storing to prevent BOM issues
+        contents = [normalize_text(doc.content) for doc in documents]
+        logger.debug("Generating embeddings for %d documents...", len(documents))
         embeddings = self._embedding_fn.embed_documents(contents)
 
         # Prepare points for upsert
         points = []
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
+        for i, (doc, embedding, clean_content) in enumerate(zip(documents, embeddings, contents)):
             # Generate a unique integer ID from doc_id or index
             if doc.doc_id:
                 # Use hash of doc_id for consistent integer ID
@@ -260,11 +258,19 @@ class QdrantVectorStore:
             else:
                 point_id = abs(hash(f"{collection_name}_{i}_{time.time()}")) % (10**18)
 
-            # Store content in payload along with metadata
+            # Normalize metadata string values to prevent BOM issues
+            clean_metadata = {}
+            for key, value in doc.metadata.items():
+                if isinstance(value, str):
+                    clean_metadata[key] = normalize_text(value)
+                else:
+                    clean_metadata[key] = value
+
+            # Store normalized content in payload along with metadata
             payload = {
-                "content": doc.content,
+                "content": clean_content,
                 "doc_id": doc.doc_id,
-                **doc.metadata,
+                **clean_metadata,
             }
 
             points.append(
@@ -284,7 +290,7 @@ class QdrantVectorStore:
                 points=batch,
             )
 
-        console.print(f"[green]Added {len(documents)} documents to {collection_name}[/]")
+        logger.info("Added %d documents to %s", len(documents), collection_name)
         return len(documents)
 
     def search(
@@ -345,8 +351,21 @@ class QdrantVectorStore:
                 continue
 
             payload = dict(hit.payload) if hit.payload else {}
-            content = payload.pop("content", "")
+
+            # ============================================
+            # FIX: Normalize content to strip BOM characters
+            # This is the root cause fix for the encoding error
+            # ============================================
+            content = normalize_text(payload.pop("content", ""))
             doc_id = payload.pop("doc_id", None)
+
+            # Also normalize any string metadata fields
+            clean_metadata = {}
+            for key, value in payload.items():
+                if isinstance(value, str):
+                    clean_metadata[key] = normalize_text(value)
+                else:
+                    clean_metadata[key] = value
 
             # Deduplication
             content_hash = hash(content[:500])
@@ -358,7 +377,7 @@ class QdrantVectorStore:
                 SearchResult(
                     document=Document(
                         content=content,
-                        metadata=payload,
+                        metadata=clean_metadata,
                         doc_id=doc_id,
                     ),
                     score=score,
@@ -440,6 +459,6 @@ class QdrantVectorStore:
                     distance=Distance.COSINE,
                 ),
             )
-            console.print(f"[yellow]Cleared collection: {collection_name}[/]")
+            logger.info("Cleared collection: %s", collection_name)
         except Exception as e:
             logger.warning(f"Failed to clear collection {collection_name}: {e}")

@@ -30,35 +30,40 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
 
         response = ask_service.ask(normalized_question)
 
-        sources = [
-            SourceInfo(
-                title=normalize_text(source.title),
-                doc_type=normalize_text(source.doc_type),
-                relevance_score=source.relevance_score or 0.0,
-                excerpt=normalize_text(source.excerpt or ""),
-            )
-            for source in response.sources
-        ]
-
-        clean_answer = normalize_text(response.text)
+        # Convert sources to SourceInfo objects
+        sources = []
+        for source in response.sources_used:
+            if isinstance(source, str):
+                sources.append(
+                    SourceInfo(
+                        title=source.replace("[Source] ", ""),
+                        doc_type="regulation",
+                        relevance_score=0.0,
+                        excerpt=None,
+                    )
+                )
+            else:
+                sources.append(
+                    SourceInfo(
+                        title=source.get("source", "Unknown"),
+                        doc_type=source.get("doc_type", "unknown"),
+                        relevance_score=source.get("score", 0.0),
+                        excerpt=source.get("excerpt") or "",
+                    )
+                )
 
         return AnswerResponse(
-            answer=clean_answer,
+            answer=response.answer,
             sources=sources,
             question=normalized_question,
             model_used=response.model_used or "gemini-2.0-flash",
         )
 
     except ValueError as e:
-        error_msg = normalize_text(str(e)) or "Invalid request"
-        logger.warning(f"Invalid request: {error_msg}")
-        raise HTTPException(
-            status_code=400,
-            detail=error_msg,
-        )
-    except Exception as e:  # noqa: BLE001
-        error_msg = normalize_text(str(e))
-        logger.exception(f"Error processing question: {error_msg}")
+        logger.warning(f"Invalid request: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Error processing question: {e}")
         raise HTTPException(
             status_code=500,
             detail="An error occurred while processing your question. Please try again.",
