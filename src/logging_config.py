@@ -1,8 +1,51 @@
 """Structured logging configuration for F1 Penalty Agent."""
 
+import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
+
+
+class JSONExceptionFormatter(logging.Formatter):
+    """Formatter that outputs logs as JSON with exception details.
+
+    This formatter produces structured JSON logs suitable for parsing
+    by log aggregation tools like Cloud Run, Stackdriver, or ELK.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON string.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            JSON string with structured log data.
+        """
+        log_entry: dict[str, Any] = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        # Add location info
+        log_entry["location"] = {
+            "file": record.filename,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Add exception info if present
+        if record.exc_info and record.exc_info[0] is not None:
+            log_entry["exception"] = {
+                "type": record.exc_info[0].__name__,
+                "message": str(record.exc_info[1]) if record.exc_info[1] else None,
+                "traceback": self.formatException(record.exc_info),
+            }
+
+        return json.dumps(log_entry)
 
 
 def setup_logging(
@@ -28,10 +71,7 @@ def setup_logging(
 
     # Create formatter
     if json_format:
-        formatter = logging.Formatter(
-            '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
-            '"module": "%(module)s", "message": "%(message)s"}'
-        )
+        formatter = JSONExceptionFormatter()
     else:
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(module)s:%(funcName)s | %(message)s",
