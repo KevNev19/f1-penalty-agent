@@ -8,8 +8,6 @@ embedding-based similarity alone.
 import logging
 from typing import TYPE_CHECKING
 
-from ..common.console import console
-
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder
 
@@ -45,9 +43,9 @@ class CrossEncoderReranker:
             try:
                 from sentence_transformers import CrossEncoder
 
-                console.print(f"[dim]Loading cross-encoder model: {self.model_name}[/]")
+                logger.debug(f"Loading cross-encoder model: {self.model_name}")
                 self._model = CrossEncoder(self.model_name)
-                console.print("[green]Cross-encoder model loaded[/]")
+                logger.info("Cross-encoder model loaded")
             except ImportError:
                 raise ImportError(
                     "Please install sentence-transformers to use cross-encoder re-ranking: "
