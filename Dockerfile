@@ -40,8 +40,13 @@ WORKDIR /app
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install curl for healthcheck and locales for proper UTF-8 support
+RUN apt-get update && apt-get install -y \
+    curl \
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen en_US.UTF-8
 
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
@@ -58,8 +63,10 @@ USER appuser
 
 # Set encoding to UTF-8 to prevent ASCII errors with BOM
 ENV PYTHONIOENCODING=utf-8
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
+ENV PYTHONUNBUFFERED=1
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV LANGUAGE=en_US:en
 
 # Expose port
 EXPOSE 8000

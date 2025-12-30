@@ -11,7 +11,8 @@ import sys
 logger = logging.getLogger(__name__)
 
 # Check if we're in a headless/production environment
-_IS_HEADLESS = not sys.stdout.isatty() or sys.stdout.encoding.lower() not in ("utf-8", "utf8")
+_stdout_encoding = (sys.stdout.encoding or "ascii").lower()
+_IS_HEADLESS = not sys.stdout.isatty() or _stdout_encoding not in ("utf-8", "utf8")
 
 
 class SafeConsole:
