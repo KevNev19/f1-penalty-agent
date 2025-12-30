@@ -1,11 +1,15 @@
 """CLI interface for the F1 Penalty Agent."""
 
+import json
+import os
+
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from ..common.exception_handler import format_exception_json
 from ..common.utils import chunk_text, normalize_text
 
 app = typer.Typer(
@@ -16,6 +20,46 @@ app = typer.Typer(
 
 # Fix Windows encoding issues with emojis
 console = Console(force_terminal=True, legacy_windows=False)
+
+# Determine if we're in debug mode (shows full stack traces)
+DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
+
+
+def handle_cli_error(exc: Exception) -> None:
+    """Handle and display errors in CLI with structured format.
+
+    In debug mode, shows full JSON error details.
+    In normal mode, shows a user-friendly message with error code.
+
+    Args:
+        exc: The exception to handle.
+    """
+    error_data = format_exception_json(exc, include_trace=DEBUG_MODE)
+
+    if DEBUG_MODE:
+        # Full JSON output for debugging
+        console.print(
+            Panel(
+                json.dumps(error_data, indent=2),
+                title="[bold red]Error Details[/]",
+                border_style="red",
+            )
+        )
+    else:
+        # User-friendly message
+        error_type = error_data["error"]["type"]
+        error_msg = error_data["error"]["message"]
+        error_code = error_data["error"].get("code", "UNKNOWN")
+        location = error_data.get("location", {})
+
+        console.print(f"\n[red]Error [{error_code}]:[/] {error_msg}")
+        console.print(f"[dim]Type: {error_type}[/]")
+
+        if location:
+            loc_str = f"{location.get('file', '?')}:{location.get('line', '?')} in {location.get('method', '?')}"
+            console.print(f"[dim]Location: {loc_str}[/]")
+
+        console.print("[dim]Set DEBUG=true for full details[/]")
 
 
 def get_agent():
@@ -73,7 +117,7 @@ def chat():
     try:
         agent = get_agent()
     except Exception as e:
-        console.print(f"[red]Failed to initialize agent: {e}[/]")
+        handle_cli_error(e)
         raise typer.Exit(1)
 
     while True:
@@ -108,7 +152,7 @@ def chat():
             console.print("\n[dim]Goodbye! 🏁[/]")
             break
         except Exception as e:
-            console.print(f"[red]Error: {e}[/]")
+            handle_cli_error(e)
 
 
 @app.command()
@@ -119,7 +163,7 @@ def ask(
     try:
         agent = get_agent()
     except Exception as e:
-        console.print(f"[red]Failed to initialize agent: {e}[/]")
+        handle_cli_error(e)
         raise typer.Exit(1)
 
     with console.status("[bold green]Thinking...[/]"):
@@ -177,7 +221,7 @@ def status():
         else:
             console.print(f"\n[green]Total: {total} indexed documents[/]")
     except Exception as e:
-        console.print(f"[red]Error connecting to Qdrant: {e}[/]")
+        handle_cli_error(e)
 
 
 @app.command()
@@ -380,7 +424,7 @@ def setup(
         console.print("[dim]Run 'f1agent ask \"What is the penalty for track limits?\"' to test[/]")
 
     except Exception as e:
-        console.print(f"[red]Error during setup: {e}[/]")
+        handle_cli_error(e)
         raise typer.Exit(1)
 
 

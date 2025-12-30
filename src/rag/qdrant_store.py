@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
+from ..common.exceptions import (
+    QdrantConnectionError,
+)
 from ..common.utils import normalize_text
 
 logger = logging.getLogger(__name__)
@@ -151,16 +154,23 @@ class QdrantVectorStore:
     def _get_client(self) -> "QdrantClient":
         """Get or create Qdrant client connection."""
         if self._client is None:
-            from qdrant_client import QdrantClient
+            try:
+                from qdrant_client import QdrantClient
 
-            self._client = QdrantClient(
-                url=self.url,
-                api_key=self.api_key,
-            )
-            logger.info("Connected to Qdrant at: %s", self.url)
+                self._client = QdrantClient(
+                    url=self.url,
+                    api_key=self.api_key,
+                )
+                logger.info("Connected to Qdrant at: %s", self.url)
 
-            # Ensure collections exist
-            self._ensure_collections()
+                # Ensure collections exist
+                self._ensure_collections()
+            except Exception as e:
+                raise QdrantConnectionError(
+                    f"Failed to connect to Qdrant at {self.url}",
+                    cause=e,
+                    context={"url": self.url},
+                ) from e
 
         return self._client
 
