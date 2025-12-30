@@ -130,6 +130,33 @@ steps:
         exit 1
     waitFor: ["deploy"]
 
+  # ============================================================
+  # Stage 7: Build Frontend (PitWallAI)
+  # ============================================================
+  - name: "node:20"
+    id: "build-frontend"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        cd frontend
+        npm install
+        npm run build
+    waitFor: ["test"]
+
+  # ============================================================
+  # Stage 8: Deploy to Firebase Hosting
+  # ============================================================
+  - name: "node:20"
+    id: "deploy-firebase"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        # Use npx to avoid installing firebase-tools globally
+        npx firebase-tools deploy --only hosting --non-interactive --project ${PROJECT_ID}
+    waitFor: ["build-frontend", "verify"]
+
 # Store image in Artifact Registry
 images:
   - "${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}"

@@ -27,10 +27,10 @@ DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
 
 # Create FastAPI app
 app = FastAPI(
-    title="F1 Penalty Agent API",
+    title="PitWallAI API",
     description=(
-        "AI-powered API for understanding F1 penalties and FIA regulations. "
-        "Uses RAG with official FIA documents and race data."
+        "AI-powered official Pit Wall assistant for Formula 1. "
+        "Explains penalties and FIA regulations using RAG with official documents."
     ),
     version="1.0.0",
     docs_url="/docs",

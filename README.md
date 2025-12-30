@@ -1,6 +1,6 @@
-# F1 Penalty Agent 🏎️
+# PitWallAI 🏎️
 
-An AI-powered agent that explains Formula 1 penalties and regulations using RAG (Retrieval-Augmented Generation) with official FIA documents.
+An AI-powered official Pit Wall assistant that explains Formula 1 penalties and regulations using RAG (Retrieval-Augmented Generation) with official FIA documents.
 
 ## Features
 
@@ -22,8 +22,8 @@ An AI-powered agent that explains Formula 1 penalties and regulations using RAG 
 
 ```bash
 # Clone repository
-git clone https://github.com/KevNev19/f1-penalty-agent.git
-cd f1-penalty-agent
+git clone https://github.com/KevNev19/pitwall-ai.git
+cd pitwall-ai
 
 # Install dependencies
 pip install poetry
@@ -72,7 +72,7 @@ poetry run f1agent chat
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/ready` | GET | Readiness probe (checks Qdrant connection) |
-| `/api/v1/ask` | POST | Ask a question about F1 penalties |
+| `/api/v1/ask` | POST | Ask a question to PitWallAI |
 | `/api/v1/setup/status` | GET | Check if knowledge base is populated |
 | `/api/v1/setup` | POST | Index sample data into knowledge base |
 | `/docs` | GET | OpenAPI documentation |
@@ -106,7 +106,7 @@ curl -X POST "http://localhost:8000/api/v1/setup" \
 ## Project Structure
 
 ```
-f1-penalty-agent/
+pitwall-ai/
 ├── .github/workflows/  # CI/CD pipelines
 │   ├── ci.yml          # Lint, test, build
 │   ├── deploy.yml      # Deploy to Cloud Run

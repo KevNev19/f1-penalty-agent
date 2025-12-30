@@ -1,7 +1,7 @@
 [project]
-name = "f1-penalty-agent"
+name = "pitwall-ai"
 version = "0.1.0"
-description = "AI agent for explaining F1 penalties and FIA regulations to F1 viewers"
+description = "PitWallAI: AI-powered F1 strategic penalty and regulation agent"
 authors = [
     {name = "addis"}
 ]
@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.scripts]
-f1agent = "src.adapters.inbound.cli:app"
+pitwall = "src.adapters.inbound.cli:app"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

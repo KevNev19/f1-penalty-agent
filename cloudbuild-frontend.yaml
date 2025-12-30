@@ -1,0 +1,45 @@
+# Cloud Build configuration for PitWallAI Frontend
+#
+# Triggered by changes to: frontend/**
+# Deploys: Firebase Hosting
+
+steps:
+  # ============================================================
+  # Stage 1: Install dependencies
+  # ============================================================
+  - name: "node:20"
+    id: "install"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        cd frontend
+        npm ci
+
+  # ============================================================
+  # Stage 2: Build production bundle
+  # ============================================================
+  - name: "node:20"
+    id: "build"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        cd frontend
+        npm run build
+    waitFor: ["install"]
+
+  # ============================================================
+  # Stage 3: Deploy to Firebase Hosting
+  # ============================================================
+  - name: "node:20"
+    id: "deploy"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        npx firebase-tools deploy --only hosting --non-interactive --project ${PROJECT_ID}
+    waitFor: ["build"]
+
+options:
+  logging: CLOUD_LOGGING_ONLY

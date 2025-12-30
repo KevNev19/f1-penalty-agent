@@ -13,8 +13,8 @@ from ....core.domain.utils import chunk_text, normalize_text
 from ...common.exception_handler import format_exception_json
 
 app = typer.Typer(
-    name="f1agent",
-    help="F1 Penalty Agent - Understand F1 penalties and regulations",
+    name="pitwall",
+    help="PitWallAI - Official F1 strategic penalty and regulation assistant",
     add_completion=False,
 )
 
@@ -102,14 +102,14 @@ def chat():
     """Start an interactive chat session with the F1 agent."""
     console.print(
         Panel.fit(
-            "[bold red]🏎️ F1 Penalty Agent[/]\n"
-            "[dim]Ask questions about F1 penalties and regulations[/]\n\n"
+            "[bold red]🏎️ PitWallAI[/]\n"
+            "[dim]Official F1 strategic penalty and regulation assistant[/]\n\n"
             "Examples:\n"
             "• Why did Verstappen get a penalty in Austria?\n"
             "• What's the rule for track limits?\n"
             "• How are unsafe pit releases penalized?\n\n"
             "[dim]Type 'quit' or 'exit' to leave[/]",
-            title="Welcome",
+            title="Welcome to PitWallAI",
             border_style="red",
         )
     )
@@ -183,7 +183,7 @@ def status():
     from ....adapters.outbound.vector_store.qdrant_adapter import QdrantAdapter as QdrantVectorStore
     from ....config.settings import settings
 
-    console.print("[bold]F1 Penalty Agent Status[/]\n")
+    console.print("[bold]PitWallAI Status[/]\n")
 
     # Check API keys
     if settings.google_api_key:
@@ -407,7 +407,7 @@ def setup(
     from ....adapters.outbound.vector_store.qdrant_adapter import QdrantAdapter as QdrantVectorStore
     from ....config.settings import settings
 
-    console.print("[bold]F1 Penalty Agent Setup[/]\n")
+    console.print("[bold]PitWallAI Setup[/]\n")
 
     # Check credentials
     if not settings.google_api_key:

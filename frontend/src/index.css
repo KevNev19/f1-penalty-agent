@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  /* F1 Official Color Palette */
+  --color-f1-red: #e10600;
+  --color-f1-dark: #15151e;
+  --color-f1-grey: #38383f;
+  --color-f1-silver: #949498;
+
+  /* Modern High-End Typography Proxy for F1 Font */
+  --font-f1: "Titillium Web", system-ui, sans-serif;
+
+  /* Iconic F1 Structural Elements */
+  --animate-f1-tilt: f1-tilt 0.3s ease-out;
+}
+
+@layer base {
+  body {
+    @apply bg-f1-dark text-white font-f1 antialiased;
+    background-image: radial-gradient(circle at top right, #1a1a2e, #15151e);
+  }
+}
+
+@layer utilities {
+  .f1-slant {
+    clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+  }
+
+  .f1-border-bottom {
+    position: relative;
+  }
+
+  .f1-border-bottom::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background-color: var(--color-f1-red);
+    border-radius: 2px;
+  }
+}
+
+@keyframes f1-tilt {
+  from {
+    transform: skewX(0deg);
+  }
+
+  to {
+    transform: skewX(-5deg);
+  }
+}
+
+@keyframes scan {
+  0% {
+    top: 0%;
+  }
+
+  100% {
+    top: 100%;
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-scan {
+  animation: scan 4s linear infinite;
+}
+
+.animate-progress {
+  animation: progress 2s infinite linear;
+}
