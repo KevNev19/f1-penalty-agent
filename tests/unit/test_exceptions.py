@@ -8,12 +8,12 @@ import json
 
 import pytest
 
-from src.common.exception_handler import (
+from src.adapters.common.exception_handler import (
     format_exception_json,
     get_error_code,
     get_http_status_code,
 )
-from src.common.exceptions import (
+from src.core.domain.exceptions import (
     ConfigurationError,
     EmbeddingError,
     EmptyQueryError,
@@ -260,7 +260,7 @@ class TestNegativeScenarios:
 
     def test_empty_query_raises_validation_error(self):
         """Empty query should raise EmptyQueryError."""
-        from src.agent.f1_agent import F1Agent
+        from src.core.services.agent_service import AgentService as F1Agent
 
         # Create a minimal mock agent
         class MockLLM:
@@ -279,7 +279,7 @@ class TestNegativeScenarios:
 
     def test_missing_api_key_raises_error(self):
         """Missing API key should raise MissingAPIKeyError."""
-        from src.llm.gemini_client import GeminiClient
+        from src.adapters.outbound.llm.gemini_adapter import GeminiAdapter as GeminiClient
 
         client = GeminiClient(api_key="", model="test")
 
@@ -290,7 +290,9 @@ class TestNegativeScenarios:
         """Invalid Qdrant credentials should raise QdrantConnectionError."""
         from unittest.mock import patch
 
-        from src.rag.qdrant_store import QdrantVectorStore
+        from src.adapters.outbound.vector_store.qdrant_adapter import (
+            QdrantAdapter as QdrantVectorStore,
+        )
 
         store = QdrantVectorStore(
             url="https://invalid.qdrant.example.com:6333",

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Import dataclasses from qdrant_store
-from src.rag.qdrant_store import Document, SearchResult
+from src.core.domain import Document, SearchResult
 
 
 class TestDocument:
@@ -52,7 +52,7 @@ class TestGeminiEmbeddingFunction:
     @pytest.mark.unit
     def test_embed_query_returns_vector(self):
         """Test that embed_query returns a list of floats."""
-        from src.rag.qdrant_store import GeminiEmbeddingFunction
+        from src.adapters.outbound.vector_store.qdrant_adapter import GeminiEmbeddingFunction
 
         with patch("requests.post") as mock_post:
             mock_response = MagicMock()
@@ -69,7 +69,7 @@ class TestGeminiEmbeddingFunction:
     @pytest.mark.unit
     def test_embed_documents_returns_vectors(self):
         """Test that embed_documents returns list of vectors."""
-        from src.rag.qdrant_store import GeminiEmbeddingFunction
+        from src.adapters.outbound.vector_store.qdrant_adapter import GeminiEmbeddingFunction
 
         with patch("requests.post") as mock_post:
             mock_response = MagicMock()
@@ -103,7 +103,9 @@ class TestQdrantVectorStore:
     @pytest.fixture
     def store_with_mocked_client(self, mock_qdrant_client):
         """Create a store with pre-injected mock client."""
-        from src.rag.qdrant_store import QdrantVectorStore
+        from src.adapters.outbound.vector_store.qdrant_adapter import (
+            QdrantAdapter as QdrantVectorStore,
+        )
 
         # Create store without calling _get_client
         store = object.__new__(QdrantVectorStore)

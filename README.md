@@ -41,7 +41,7 @@ cp .env.example .env
 
 ```bash
 # Start API server
-poetry run uvicorn src.api.main:app --reload
+poetry run uvicorn src.adapters.inbound.api.main:app --reload
 
 # API available at http://localhost:8000
 # Docs at http://localhost:8000/docs
@@ -113,14 +113,20 @@ f1-penalty-agent/
 │   ├── infrastructure.yml  # Terraform plan/apply
 │   └── release.yml     # GitHub releases
 ├── src/
-│   ├── api/            # FastAPI backend
-│   │   └── routers/    # API endpoints (chat, health, setup)
-│   ├── rag/            # Qdrant + retriever + reranker
-│   ├── agent/          # F1Agent logic
-│   ├── llm/            # Gemini client
-│   ├── interface/      # CLI
-│   ├── common/         # Shared utilities (sanitize_text, chunk_text)
-│   └── data/           # FIA scraper, FastF1 loader, Jolpica client
+│   ├── core/           # Domain logic (hexagonal core)
+│   │   ├── domain/     # Models, exceptions, utilities
+│   │   ├── ports/      # Abstract interfaces
+│   │   └── services/   # Business logic (AgentService, RetrievalService)
+│   ├── adapters/       # External integrations
+│   │   ├── inbound/    # Entry points (API, CLI)
+│   │   │   ├── api/    # FastAPI backend
+│   │   │   └── cli/    # Typer CLI
+│   │   ├── outbound/   # External services
+│   │   │   ├── llm/    # GeminiAdapter
+│   │   │   ├── vector_store/  # QdrantAdapter
+│   │   │   └── data_sources/  # FIA, FastF1, Jolpica adapters
+│   │   └── common/     # Shared adapter utilities
+│   └── config/         # Settings and logging
 ├── infra/terraform/    # GCP infrastructure as code
 ├── tests/              # Unit + integration tests
 └── Dockerfile          # Production container
