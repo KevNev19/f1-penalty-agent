@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
+from ..common.utils import normalize_text
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -227,14 +229,14 @@ class QdrantVectorStore:
 
         client = self._get_client()
 
-        # Generate embeddings
-        contents = [doc.content for doc in documents]
+        # Normalize content before storing to prevent BOM issues
+        contents = [normalize_text(doc.content) for doc in documents]
         logger.debug("Generating embeddings for %d documents...", len(documents))
         embeddings = self._embedding_fn.embed_documents(contents)
 
         # Prepare points for upsert
         points = []
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
+        for i, (doc, embedding, clean_content) in enumerate(zip(documents, embeddings, contents)):
             # Generate a unique integer ID from doc_id or index
             if doc.doc_id:
                 # Use hash of doc_id for consistent integer ID
@@ -242,11 +244,19 @@ class QdrantVectorStore:
             else:
                 point_id = abs(hash(f"{collection_name}_{i}_{time.time()}")) % (10**18)
 
-            # Store content in payload along with metadata
+            # Normalize metadata string values to prevent BOM issues
+            clean_metadata = {}
+            for key, value in doc.metadata.items():
+                if isinstance(value, str):
+                    clean_metadata[key] = normalize_text(value)
+                else:
+                    clean_metadata[key] = value
+
+            # Store normalized content in payload along with metadata
             payload = {
-                "content": doc.content,
+                "content": clean_content,
                 "doc_id": doc.doc_id,
-                **doc.metadata,
+                **clean_metadata,
             }
 
             points.append(
@@ -327,8 +337,21 @@ class QdrantVectorStore:
                 continue
 
             payload = dict(hit.payload) if hit.payload else {}
-            content = payload.pop("content", "")
+
+            # ============================================
+            # FIX: Normalize content to strip BOM characters
+            # This is the root cause fix for the encoding error
+            # ============================================
+            content = normalize_text(payload.pop("content", ""))
             doc_id = payload.pop("doc_id", None)
+
+            # Also normalize any string metadata fields
+            clean_metadata = {}
+            for key, value in payload.items():
+                if isinstance(value, str):
+                    clean_metadata[key] = normalize_text(value)
+                else:
+                    clean_metadata[key] = value
 
             # Deduplication
             content_hash = hash(content[:500])
@@ -340,7 +363,7 @@ class QdrantVectorStore:
                 SearchResult(
                     document=Document(
                         content=content,
-                        metadata=payload,
+                        metadata=clean_metadata,
                         doc_id=doc_id,
                     ),
                     score=score,
