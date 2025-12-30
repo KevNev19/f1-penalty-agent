@@ -32,13 +32,15 @@ resource "google_secret_manager_secret" "qdrant_api_key" {
 
 # Auto-populate Qdrant secrets from Terraform-created cluster
 resource "google_secret_manager_secret_version" "qdrant_url_version" {
+  count       = var.skip_qdrant ? 0 : 1
   secret      = google_secret_manager_secret.qdrant_url.id
-  secret_data = qdrant-cloud_accounts_cluster.f1_agent.url
+  secret_data = qdrant-cloud_accounts_cluster.f1_agent[0].url
 }
 
 resource "google_secret_manager_secret_version" "qdrant_api_key_version" {
+  count       = var.skip_qdrant ? 0 : 1
   secret      = google_secret_manager_secret.qdrant_api_key.id
-  secret_data = qdrant-cloud_accounts_database_api_key_v2.f1_agent_key.key
+  secret_data = qdrant-cloud_accounts_database_api_key_v2.f1_agent_key[0].key
 }
 
 # Grant Cloud Run service account access to secrets
