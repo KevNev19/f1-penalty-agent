@@ -1,6 +1,6 @@
 import pytest
 
-from src.common.utils import chunk_text
+from src.core.domain.utils import chunk_text
 
 
 class TestChunkText:

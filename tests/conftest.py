@@ -74,7 +74,7 @@ def qdrant_api_key():
 @pytest.fixture(scope="session")
 def settings():
     """Get application settings."""
-    from src.config import Settings
+    from src.config.settings import Settings
 
     return Settings()
 

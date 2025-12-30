@@ -1,33 +1,31 @@
 # Developer Guide
 
-## Architecture
+## Architecture (Hexagonal)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     User Interface                          │
-│              (CLI / React Frontend / API)                   │
+│                   Primary Adapters (Inbound)                │
+│        (CLI: src/adapters/inbound/cli)                      │
+│        (API: src/adapters/inbound/api)                      │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│                     FastAPI Backend                          │
-│  - Health/Ready endpoints                                    │
-│  - /api/v1/ask endpoint                                      │
-│  - /api/v1/setup endpoints                                   │
+│                    Core Services                             │
+│        AgentService (src/core/services/agent_service.py)    │
+│        RetrievalService (src/core/services/retrieval_service.py) │
 └────────────┬─────────────────────────────────┬──────────────┘
              │                                 │
 ┌────────────▼────────────┐      ┌─────────────▼─────────────┐
-│       F1Retriever       │      │      GeminiClient         │
-│  - Query expansion      │      │  - Chat Generation        │
-│  - Cross-encoder rerank │      │  - Retry Logic (3x)       │
-│  - Context building     │      └───────────────────────────┘
-└────────────┬────────────┘
-             │
-┌────────────▼────────────┐
-│    QdrantVectorStore    │
-│  - Gemini Embeddings    │
-│  - Collection separation│
-│  - Score filtering      │
-└────────────┬────────────┘
+│    Ports (Interfaces)   │      │    Ports (Interfaces)     │
+│    VectorStorePort      │      │    LLMPort                │
+│    (src/core/ports/)    │      │    (src/core/ports/)      │
+└────────────┬────────────┘      └─────────────┬─────────────┘
+             │                                 │
+┌────────────▼────────────┐      ┌─────────────▼─────────────┐
+│  Secondary Adapters     │      │  Secondary Adapters       │
+│  QdrantAdapter          │      │  GeminiAdapter            │
+│  (src/adapters/outbound)│      │  (src/adapters/outbound)  │
+└────────────┬────────────┘      └───────────────────────────┘
              │
 ┌────────────▼────────────┐
 │      Qdrant Cloud       │
@@ -84,7 +82,7 @@ poetry run ruff format src/ tests/ --check
 
 ## Key Components
 
-### QdrantVectorStore (`src/rag/qdrant_store.py`)
+### QdrantAdapter (`src/adapters/outbound/vector_store/qdrant_adapter.py`)
 
 - **Gemini Embeddings**: 768-dim vectors via Google API
 - **Collections**: Separate storage for regulations, stewards_decisions, race_data
@@ -92,27 +90,27 @@ poetry run ruff format src/ tests/ --check
 - **Auto-collection creation**: Creates collections on first use
 - **API**: Uses `query_points` (qdrant-client 1.16+)
 
-### CrossEncoderReranker (`src/rag/reranker.py`)
+### CrossEncoderReranker (`src/core/services/reranker.py`)
 
 - **MS MARCO MiniLM**: Optimized for passage re-ranking
 - **Lazy loading**: Model loaded on first use
 - **Precision boost**: +15-20% improvement
 - **Note**: Disabled on Windows due to torch DLL issues
 
-### F1Retriever (`src/rag/retriever.py`)
+### RetrievalService (`src/core/services/retrieval_service.py`)
 
 - **Query expansion**: F1-specific synonyms
 - **Keyword boosting**: Exact match scoring
 - **Deduplication**: Removes redundant results
 
-### Common Utilities (`src/common/utils.py`)
+### Common Utilities (`src/core/domain/utils.py`)
 
 Shared helper functions used across CLI, API, and LLM:
 
 - **`sanitize_text(text)`**: Removes BOM and non-ASCII characters for API-safe text
 - **`chunk_text(text, chunk_size, overlap)`**: Splits text into overlapping chunks (1500 chars, 200 overlap) for better vector search
 
-### FastAPI Backend (`src/api/`)
+### FastAPI Backend (`src/adapters/inbound/api/`)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -123,7 +121,7 @@ Shared helper functions used across CLI, API, and LLM:
 | `/api/v1/setup` | POST | Index sample data |
 | `/docs` | GET | OpenAPI documentation |
 
-### CLI (`src/interface/cli.py`)
+### CLI (`src/adapters/inbound/cli/commands.py`)
 
 | Command | Description |
 |---------|-------------|
