@@ -55,6 +55,7 @@ jobs:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
           TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
           TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
+          TF_VAR_skip_qdrant: "true"
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v6
@@ -123,6 +124,7 @@ jobs:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
           TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
           TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
+          TF_VAR_skip_qdrant: "true"
 
       - name: Terraform Outputs
         working-directory: ${{ env.WORKING_DIR }}
