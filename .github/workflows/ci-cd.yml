@@ -24,15 +24,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
-  TF_VERSION: "1.6.0"
-  PROJECT_ID: gen-lang-client-0855046443
-  REGION: europe-west3
-  SERVICE_NAME: pitwall-api
-  AR_REPOSITORY: f1-agent
-  VITE_API_BASE_URL: https://f1-penalty-agent-mb4t5jwica-ey.a.run.app
+# Configuration is managed via GitHub Repository Variables:
+#   PYTHON_VERSION, NODE_VERSION, TF_VERSION, PROJECT_ID,
+#   REGION, SERVICE_NAME, AR_REPOSITORY, VITE_API_BASE_URL
+# Go to: Settings > Secrets and variables > Actions > Variables
 
 # =============================================================================
 # CI STAGE - Runs on all pushes and PRs
@@ -51,7 +46,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ vars.PYTHON_VERSION }}
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -80,7 +75,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ vars.PYTHON_VERSION }}
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -109,7 +104,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ vars.PYTHON_VERSION }}
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -193,7 +188,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ env.TF_VERSION }}
+          terraform_version: ${{ vars.TF_VERSION }}
 
       - name: Terraform Init
         working-directory: infra/terraform
@@ -260,7 +255,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ env.TF_VERSION }}
+          terraform_version: ${{ vars.TF_VERSION }}
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4
@@ -311,7 +306,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
@@ -321,23 +316,23 @@ jobs:
       - name: Load and tag Docker image
         run: |
           gunzip -c image.tar.gz | docker load
-          docker tag pitwall-api:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          docker tag pitwall-api:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+          docker tag pitwall-api:${{ github.sha }} ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ vars.SERVICE_NAME }}:${{ github.sha }}
+          docker tag pitwall-api:${{ github.sha }} ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ vars.SERVICE_NAME }}:latest
 
       - name: Push Docker image
         run: |
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+          docker push ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ vars.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ vars.SERVICE_NAME }}:latest
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            --region ${{ env.REGION }} \
+          gcloud run deploy ${{ vars.SERVICE_NAME }} \
+            --image ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/${{ vars.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ vars.REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 8000 \
-            --service-account f1-agent-runner@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --service-account f1-agent-runner@${{ vars.PROJECT_ID }}.iam.gserviceaccount.com \
             --cpu-boost \
             --min-instances 0 \
             --max-instances 2 \
@@ -348,7 +343,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
+          SERVICE_URL=$(gcloud run services describe ${{ vars.SERVICE_NAME }} --region=${{ vars.REGION }} --format='value(status.url)')
           echo "Service URL: $SERVICE_URL"
 
           for i in 1 2 3; do
@@ -378,7 +373,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ vars.NODE_VERSION }}
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -390,7 +385,7 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -398,4 +393,4 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           channelId: live
-          projectId: ${{ env.PROJECT_ID }}
+          projectId: ${{ vars.PROJECT_ID }}
