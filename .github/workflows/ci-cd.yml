@@ -148,42 +148,17 @@ jobs:
           cache-to: type=gha,mode=max
 
   # =============================================================================
-  # INFRASTRUCTURE STAGE - Only on main when infra changes
+  # INFRASTRUCTURE STAGE - Runs plan on every main push, apply only if changes
   # =============================================================================
 
   # ---------------------------------------------------------------------------
-  # Check for Infrastructure Changes
-  # ---------------------------------------------------------------------------
-  check-infra-changes:
-    name: Check Infra Changes
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    outputs:
-      infra_changed: ${{ steps.filter.outputs.infra }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check for infra changes
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            infra:
-              - 'infra/terraform/**'
-
-  # ---------------------------------------------------------------------------
-  # Terraform Plan
+  # Terraform Plan - Always runs, costs nothing if no changes
   # ---------------------------------------------------------------------------
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    needs: [lint, check-infra-changes]
-    if: |
-      always() && 
-      needs.lint.result == 'success' && 
-      (needs.check-infra-changes.outputs.infra_changed == 'true' || github.event_name == 'workflow_dispatch')
+    needs: [lint]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
       contents: read
       id-token: write
