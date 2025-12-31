@@ -22,6 +22,8 @@ steps:
   - name: "node:20"
     id: "build"
     entrypoint: "bash"
+    env:
+      - "VITE_API_BASE_URL=https://f1-penalty-agent-mb4t5jwica-ey.a.run.app"
     args:
       - "-c"
       - |
