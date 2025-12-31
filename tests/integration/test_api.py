@@ -128,3 +128,49 @@ class TestAPIDocumentation:
         schema = response.json()
         assert schema["info"]["title"] == "PitWallAI API"
         assert "/api/v1/ask" in schema["paths"]
+
+
+class TestCORSConfiguration:
+    """Tests for CORS configuration."""
+
+    @pytest.mark.integration
+    def test_cors_preflight_allowed_origin(self, client):
+        """Test CORS preflight from allowed Firebase origin."""
+        response = client.options(
+            "/ready",
+            headers={
+                "Origin": "https://gen-lang-client-0855046443.web.app",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert response.status_code == 200
+        assert (
+            response.headers.get("Access-Control-Allow-Origin")
+            == "https://gen-lang-client-0855046443.web.app"
+        )
+
+    @pytest.mark.integration
+    def test_cors_preflight_localhost_allowed(self, client):
+        """Test CORS preflight from localhost is allowed for development."""
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers.get("Access-Control-Allow-Origin") == "http://localhost:5173"
+
+    @pytest.mark.integration
+    def test_cors_preflight_disallowed_origin(self, client):
+        """Test CORS preflight from disallowed origin is not reflected."""
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "https://evil.com",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        # Disallowed origins should not be reflected in the response
+        assert response.headers.get("Access-Control-Allow-Origin") != "https://evil.com"

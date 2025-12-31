@@ -40,8 +40,8 @@ app = FastAPI(
 ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Local dev
     "http://localhost:5173",  # Vite dev server
-    "https://*.web.app",  # Firebase hosting
-    "https://*.firebaseapp.com",  # Firebase hosting alt
+    "https://gen-lang-client-0855046443.web.app",  # Firebase hosting
+    "https://gen-lang-client-0855046443.firebaseapp.com",  # Firebase hosting alt
 ]
 
 # Configure CORS for frontend access
