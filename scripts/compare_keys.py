@@ -31,12 +31,9 @@ print("=" * 60)
 
 # Check for BOM
 local_bom = local.startswith(chr(0xFEFF))
-secret_bom = secret.startswith(chr(0xFEFF))
 
 print(f"\nLocal Key Length:  {len(local)}")
-print(f"Secret Key Length: {len(secret)}")
 print(f"Local has BOM:     {local_bom}")
-print(f"Secret has BOM:    {secret_bom}")
 
 print("\n=== COMPARISON ===")
 # Use constant-time comparison to prevent timing attacks
