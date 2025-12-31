@@ -35,9 +35,6 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Lint - Fast fail on code quality issues
-  # ---------------------------------------------------------------------------
-  # ---------------------------------------------------------------------------
   # Setup Environment & Cache - Runs first to populate cache
   # ---------------------------------------------------------------------------
   setup-env:
@@ -66,7 +63,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache-venv.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --with dev
+        run: |
+          poetry install --no-interaction --with dev
+          echo "Debug: .venv contents:"
+          ls -la .venv || echo ".venv not found"
 
   # ---------------------------------------------------------------------------
   # Linting - Depends on setup-env
@@ -95,7 +95,11 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          fail-on-cache-miss: true # Should exist from setup-env
+          # Removed fail-on-cache-miss to allow fallback
+
+      - name: Install dependencies (Fallback)
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --with dev
 
       - name: Run ruff linter
         run: poetry run ruff check src/ tests/
@@ -130,7 +134,10 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          fail-on-cache-miss: true
+
+      - name: Install dependencies (Fallback)
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --with dev
 
       - name: Run unit tests
         run: poetry run pytest tests/ -m unit -v
@@ -164,7 +171,10 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-          fail-on-cache-miss: true
+
+      - name: Install dependencies (Fallback)
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --with dev
 
       - name: Run integration tests
         run: poetry run pytest tests/ -m integration -v --tb=short
@@ -277,11 +287,6 @@ jobs:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
           TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
           TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
-
-      - name: Debug Plan Output
-        run: |
-          echo "has_changes output: ${{ steps.plan.outputs.has_changes }}"
-          ls -la infra/terraform/tfplan 2>/dev/null || echo "tfplan file not found"
 
       - name: Upload Terraform Plan
         if: steps.plan.outputs.has_changes == 'true'
