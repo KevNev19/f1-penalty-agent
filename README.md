@@ -1,5 +1,10 @@
 # PitWallAI 🏎️
 
+[![CI/CD](https://github.com/KevNev19/f1-penalty-agent/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/KevNev19/f1-penalty-agent/actions/workflows/ci-cd.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Your official AI Race Engineer for Formula 1 - get real-time insights on penalties, regulations, and race strategy using RAG (Retrieval-Augmented Generation) with official FIA documents.
 
 <p align="center">
