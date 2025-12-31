@@ -327,6 +327,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: write # Required to update repository variables
+    outputs:
+      api_url: ${{ steps.get-url.outputs.api_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -376,10 +379,22 @@ jobs:
             --set-env-vars "PYTHONIOENCODING=utf-8,PYTHONUTF8=1,LANG=C.UTF-8,LC_ALL=C.UTF-8" \
             --set-secrets "GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest"
 
-      - name: Verify deployment
+      - name: Get Service URL
+        id: get-url
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ vars.SERVICE_NAME }} --region=${{ vars.REGION }} --format='value(status.url)')
           echo "Service URL: $SERVICE_URL"
+          echo "api_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+          # Update GitHub Variable for visibility/manual checks
+          echo "Updating VITE_API_BASE_URL variable..."
+          gh variable set VITE_API_BASE_URL --body "$SERVICE_URL" || echo "Warning: Failed to update GitHub variable (permission issue?)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=${{ steps.get-url.outputs.api_url }}
 
           for i in 1 2 3; do
             echo "Health check attempt $i..."
@@ -399,7 +414,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    needs: [lint, test-unit, test-integration]
+    needs: [deploy-backend]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
     steps:
@@ -420,7 +435,7 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ needs.deploy-backend.outputs.api_url }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
