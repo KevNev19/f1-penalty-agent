@@ -12,21 +12,21 @@ const AdminPageWrapper = () => {
 // Home component to isolate verify home view
 const Home = () => (
   <>
-    <div className="text-center mb-8 animate-fade-in-down">
-      <h1 className="text-5xl font-black italic mb-2 tracking-tighter">
+    <div className="text-center mb-8 animate-fade-in-down px-4">
+      <h1 className="text-3xl md:text-5xl font-black italic mb-2 tracking-tighter">
         <span className="text-f1-red">FIA</span> REGULATION <span className="text-white">ASSISTANT</span>
       </h1>
-      <p className="text-f1-silver text-lg font-medium max-w-2xl mx-auto">
+      <p className="text-f1-silver text-sm md:text-lg font-medium max-w-2xl mx-auto">
         Real-time analysis of penalties, regulations, and stewards' decisions.
       </p>
       <div className="mt-4 flex justify-center">
-        <span className="text-f1-red font-bold uppercase tracking-[0.2em] text-sm">Official Regulation Assistant</span>
+        <span className="text-f1-red font-bold uppercase tracking-[0.2em] text-xs md:text-sm">Official Regulation Assistant</span>
       </div>
     </div>
 
     <ChatInterface />
 
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-50 hidden md:block">
       <Link
         to="/admin"
         className="bg-black/80 border border-f1-grey/30 hover:border-f1-red hover:bg-f1-red/10 text-f1-silver text-[10px] font-mono p-2 rounded uppercase tracking-widest backdrop-blur transition-all inline-block"

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, type SourceInfo } from '../services/api';
 
 interface Message {
@@ -87,29 +89,36 @@ export const ChatInterface: React.FC = () => {
                 )}
 
                 {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
                         <div
-                            className={`max-w-[85%] rounded-lg p-4 shadow-md ${msg.role === 'user'
-                                ? 'bg-f1-red text-white rounded-br-none'
-                                : 'bg-f1-black/80 border border-f1-grey/30 text-f1-silver rounded-bl-none'
+                            className={`max-w-[90%] md:max-w-[85%] p-4 shadow-md backdrop-blur-sm transition-all duration-300 ${msg.role === 'user'
+                                ? 'bg-f1-red text-white f1-clip-message-user'
+                                : 'bg-f1-black/90 border border-f1-grey/50 text-f1-silver f1-clip-message'
                                 }`}
                         >
                             {msg.role === 'agent' && (
-                                <div className="flex items-center space-x-2 mb-2 border-b border-f1-grey/20 pb-2">
-                                    <span className="w-1.5 h-1.5 bg-f1-red rounded-full"></span>
+                                <div className="flex items-center space-x-2 mb-3 border-b border-f1-grey/20 pb-2">
+                                    <span className="w-1.5 h-1.5 bg-f1-red rounded-full shadow-[0_0_5px_#e10600]"></span>
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-f1-red">Race Control</span>
                                 </div>
                             )}
 
                             {msg.isLoading ? (
                                 <div className="flex space-x-2 h-6 items-center px-2">
-                                    <div className="w-2 h-2 bg-f1-silver/50 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                                    <div className="w-2 h-2 bg-f1-silver/50 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                                    <div className="w-2 h-2 bg-f1-silver/50 rounded-full animate-bounce"></div>
+                                    <div className="w-1.5 h-1.5 bg-f1-red rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                    <div className="w-1.5 h-1.5 bg-f1-red rounded-full animate-bounce"></div>
                                 </div>
                             ) : (
-                                <div className="prose prose-invert prose-sm max-w-none whitespace-pre-line leading-relaxed">
-                                    {msg.content}
+                                <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap leading-relaxed 
+                                    prose-p:text-f1-silver prose-p:mb-2 
+                                    prose-headings:text-white prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-tight
+                                    prose-strong:text-white prose-strong:font-black
+                                    prose-a:text-f1-red prose-a:no-underline hover:prose-a:underline
+                                    prose-ul:list-disc prose-ul:pl-4 prose-li:marker:text-f1-red">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {msg.content}
+                                    </ReactMarkdown>
                                 </div>
                             )}
 
@@ -125,12 +134,12 @@ export const ChatInterface: React.FC = () => {
 
                                 return (
                                     <div className="mt-4 pt-3 border-t border-f1-grey/20">
-                                        <p className="text-[10px] font-bold text-f1-silver/60 uppercase tracking-widest mb-2">References</p>
+                                        <p className="text-[9px] font-black text-f1-silver/50 uppercase tracking-[0.2em] mb-2">Telemetry Checks</p>
                                         <div className="flex flex-wrap gap-2">
                                             {displayableSources.map((source, sIdx) => {
                                                 const Content = (
                                                     <span className="flex items-center space-x-1">
-                                                        <span className="truncate max-w-[150px]">{source.title}</span>
+                                                        <span className="truncate max-w-[150px] font-mono">{source.title}</span>
                                                         {source.url && <span className="text-[10px] opacity-70">↗</span>}
                                                     </span>
                                                 );
@@ -142,7 +151,7 @@ export const ChatInterface: React.FC = () => {
                                                             href={source.url}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="flex items-center text-[10px] bg-f1-grey/20 hover:bg-f1-red/20 border border-f1-grey/30 hover:border-f1-red/50 text-f1-silver hover:text-white px-2 py-1 rounded transition-colors"
+                                                            className="flex items-center text-[10px] bg-f1-grey/40 hover:bg-f1-red hover:text-white border border-transparent hover:border-white/20 text-f1-silver/80 px-2 py-1 rounded-sm transition-all duration-200"
                                                             title={source.excerpt || ""}
                                                         >
                                                             {Content}
@@ -152,7 +161,7 @@ export const ChatInterface: React.FC = () => {
                                                 return (
                                                     <div
                                                         key={sIdx}
-                                                        className="flex items-center text-[10px] bg-f1-grey/10 border border-f1-grey/20 text-f1-silver/70 px-2 py-1 rounded cursor-help"
+                                                        className="flex items-center text-[10px] bg-f1-grey/20 border border-f1-grey/30 text-f1-silver/60 px-2 py-1 rounded-sm cursor-help"
                                                         title={source.excerpt || ""}
                                                     >
                                                         {Content}
