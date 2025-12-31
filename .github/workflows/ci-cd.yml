@@ -54,7 +54,15 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Cache venv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --with dev
 
       - name: Run ruff linter
@@ -83,7 +91,15 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Cache venv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --with dev
 
       - name: Run unit tests
@@ -112,7 +128,15 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Cache venv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --with dev
 
       - name: Run integration tests
