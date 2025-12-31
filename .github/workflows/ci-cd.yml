@@ -18,362 +18,390 @@
 name: CI/CD
 
 on:
-    push:
-        branches: [main]
-    pull_request:
-        branches: [main]
-    workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 env:
-    PYTHON_VERSION: "3.12"
-    NODE_VERSION: "20"
-    TF_VERSION: "1.6.0"
-    PROJECT_ID: gen-lang-client-0855046443
-    REGION: europe-west3
-    SERVICE_NAME: pitwall-api
-    AR_REPOSITORY: f1-agent
-    VITE_API_BASE_URL: https://f1-penalty-agent-mb4t5jwica-ey.a.run.app
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  TF_VERSION: "1.6.0"
+  PROJECT_ID: gen-lang-client-0855046443
+  REGION: europe-west3
+  SERVICE_NAME: pitwall-api
+  AR_REPOSITORY: f1-agent
+  VITE_API_BASE_URL: https://f1-penalty-agent-mb4t5jwica-ey.a.run.app
 
 # =============================================================================
 # CI STAGE - Runs on all pushes and PRs
 # =============================================================================
 
 jobs:
-    # ---------------------------------------------------------------------------
-    # Lint - Fast fail on code quality issues
-    # ---------------------------------------------------------------------------
-    lint:
-        name: Lint
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  # ---------------------------------------------------------------------------
+  # Lint - Fast fail on code quality issues
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-            - name: Install Poetry
-              uses: snok/install-poetry@v1
-              with:
-                  virtualenvs-create: true
-                  virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-            - name: Install dependencies
-              run: poetry install --no-interaction --with dev
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
 
-            - name: Run ruff linter
-              run: poetry run ruff check src/ tests/
+      - name: Run ruff linter
+        run: poetry run ruff check src/ tests/
 
-            - name: Check ruff formatting
-              run: poetry run ruff format src/ tests/ --check
+      - name: Check ruff formatting
+        run: poetry run ruff format src/ tests/ --check
 
-    # ---------------------------------------------------------------------------
-    # Unit Tests - Parallel with Lint
-    # ---------------------------------------------------------------------------
-    test-unit:
-        name: Unit Tests
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  # ---------------------------------------------------------------------------
+  # Unit Tests - Parallel with Lint
+  # ---------------------------------------------------------------------------
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-            - name: Install Poetry
-              uses: snok/install-poetry@v1
-              with:
-                  virtualenvs-create: true
-                  virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-            - name: Install dependencies
-              run: poetry install --no-interaction --with dev
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
 
-            - name: Run unit tests
-              run: poetry run pytest tests/ -m unit -v
-              env:
-                  PYTHONPATH: .
+      - name: Run unit tests
+        run: poetry run pytest tests/ -m unit -v
+        env:
+          PYTHONPATH: .
 
-    # ---------------------------------------------------------------------------
-    # Integration Tests - After Unit Tests
-    # ---------------------------------------------------------------------------
-    test-integration:
-        name: Integration Tests
-        runs-on: ubuntu-latest
-        needs: test-unit
-        steps:
-            - uses: actions/checkout@v4
+  # ---------------------------------------------------------------------------
+  # Integration Tests - After Unit Tests
+  # ---------------------------------------------------------------------------
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test-unit
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-            - name: Install Poetry
-              uses: snok/install-poetry@v1
-              with:
-                  virtualenvs-create: true
-                  virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-            - name: Install dependencies
-              run: poetry install --no-interaction --with dev
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
 
-            - name: Run integration tests
-              run: poetry run pytest tests/ -m integration -v --tb=short
-              env:
-                  PYTHONPATH: .
+      - name: Run integration tests
+        run: poetry run pytest tests/ -m integration -v --tb=short
+        env:
+          PYTHONPATH: .
 
-    # ---------------------------------------------------------------------------
-    # Docker Build Test - Parallel with Integration Tests
-    # ---------------------------------------------------------------------------
-    docker-build:
-        name: Docker Build
-        runs-on: ubuntu-latest
-        needs: [lint, test-unit]
-        steps:
-            - uses: actions/checkout@v4
+  # ---------------------------------------------------------------------------
+  # Docker Build Test - Parallel with Integration Tests
+  # ---------------------------------------------------------------------------
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            - name: Build Docker image
-              uses: docker/build-push-action@v5
-              with:
-                  context: .
-                  push: false
-                  tags: pitwall-api:${{ github.sha }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: pitwall-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    # =============================================================================
-    # INFRASTRUCTURE STAGE - Only on main when infra changes
-    # =============================================================================
+  # =============================================================================
+  # INFRASTRUCTURE STAGE - Only on main when infra changes
+  # =============================================================================
 
-    # ---------------------------------------------------------------------------
-    # Terraform Plan
-    # ---------------------------------------------------------------------------
-    terraform-plan:
-        name: Terraform Plan
-        runs-on: ubuntu-latest
-        needs: [lint]
-        if: |
-            github.ref == 'refs/heads/main' && (
-              contains(github.event.head_commit.modified, 'infra/terraform') ||
-              contains(github.event.head_commit.added, 'infra/terraform') ||
-              github.event_name == 'workflow_dispatch'
-            )
-        permissions:
-            contents: read
-            id-token: write
-            pull-requests: write
-        outputs:
-            has_changes: ${{ steps.plan.outputs.has_changes }}
+  # ---------------------------------------------------------------------------
+  # Check for Infrastructure Changes
+  # ---------------------------------------------------------------------------
+  check-infra-changes:
+    name: Check Infra Changes
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    outputs:
+      infra_changed: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        steps:
-            - uses: actions/checkout@v4
+      - name: Check for infra changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            infra:
+              - 'infra/terraform/**'
 
-            - name: Authenticate to Google Cloud
-              uses: google-github-actions/auth@v2
-              with:
-                  workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-                  service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+  # ---------------------------------------------------------------------------
+  # Terraform Plan
+  # ---------------------------------------------------------------------------
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: [lint, check-infra-changes]
+    if: |
+      always() && 
+      needs.lint.result == 'success' && 
+      (needs.check-infra-changes.outputs.infra_changed == 'true' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
 
-            - name: Set up Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Terraform Init
-              working-directory: infra/terraform
-              run: terraform init
-              env:
-                  GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-            - name: Terraform Validate
-              working-directory: infra/terraform
-              run: terraform validate
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-            - name: Terraform Plan
-              id: plan
-              working-directory: infra/terraform
-              run: |
-                  terraform plan -no-color -out=tfplan -detailed-exitcode || exit_code=$?
-                  if [ "$exit_code" == "2" ]; then
-                    echo "has_changes=true" >> $GITHUB_OUTPUT
-                  else
-                    echo "has_changes=false" >> $GITHUB_OUTPUT
-                  fi
-              env:
-                  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-                  TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
-                  TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+        env:
+          GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
 
-            - name: Upload Terraform Plan
-              if: steps.plan.outputs.has_changes == 'true'
-              uses: actions/upload-artifact@v4
-              with:
-                  name: tfplan
-                  path: infra/terraform/tfplan
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
 
-    # ---------------------------------------------------------------------------
-    # Terraform Apply
-    # ---------------------------------------------------------------------------
-    terraform-apply:
-        name: Terraform Apply
-        runs-on: ubuntu-latest
-        needs: terraform-plan
-        if: needs.terraform-plan.outputs.has_changes == 'true'
-        environment: production
-        permissions:
-            contents: read
-            id-token: write
+      - name: Terraform Plan
+        id: plan
+        working-directory: infra/terraform
+        run: |
+          set +e
+          terraform plan -no-color -out=tfplan -detailed-exitcode
+          exit_code=$?
+          set -e
 
-        steps:
-            - uses: actions/checkout@v4
+          if [ "$exit_code" == "2" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          elif [ "$exit_code" == "0" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            exit $exit_code
+          fi
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
+          TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
 
-            - name: Authenticate to Google Cloud
-              uses: google-github-actions/auth@v2
-              with:
-                  workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-                  service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Upload Terraform Plan
+        if: steps.plan.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
 
-            - name: Set up Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+  # ---------------------------------------------------------------------------
+  # Terraform Apply
+  # ---------------------------------------------------------------------------
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: needs.terraform-plan.outputs.has_changes == 'true'
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
 
-            - name: Download Terraform Plan
-              uses: actions/download-artifact@v4
-              with:
-                  name: tfplan
-                  path: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Terraform Init
-              working-directory: infra/terraform
-              run: terraform init
-              env:
-                  GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-            - name: Terraform Apply
-              working-directory: infra/terraform
-              run: terraform apply -auto-approve tfplan
-              env:
-                  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-                  TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
-                  TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-    # =============================================================================
-    # DEPLOY STAGE - Only on main after CI passes
-    # =============================================================================
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform
 
-    # ---------------------------------------------------------------------------
-    # Deploy Backend to Cloud Run
-    # ---------------------------------------------------------------------------
-    deploy-backend:
-        name: Deploy Backend
-        runs-on: ubuntu-latest
-        needs: [lint, test-unit, test-integration, docker-build]
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        permissions:
-            contents: read
-            id-token: write
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+        env:
+          GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
 
-        steps:
-            - uses: actions/checkout@v4
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_qdrant_cloud_api_key: ${{ secrets.QDRANT_CLOUD_API_KEY }}
+          TF_VAR_qdrant_account_id: ${{ secrets.QDRANT_ACCOUNT_ID }}
 
-            - name: Authenticate to Google Cloud
-              uses: google-github-actions/auth@v2
-              with:
-                  workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-                  service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+  # =============================================================================
+  # DEPLOY STAGE - Only on main after CI passes
+  # =============================================================================
 
-            - name: Set up Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2
+  # ---------------------------------------------------------------------------
+  # Deploy Backend to Cloud Run
+  # ---------------------------------------------------------------------------
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-integration, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      id-token: write
 
-            - name: Configure Docker for Artifact Registry
-              run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Build Docker image
-              run: |
-                  docker build \
-                    -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-                    -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest \
-                    .
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-            - name: Push Docker image
-              run: |
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-                  docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-            - name: Deploy to Cloud Run
-              run: |
-                  gcloud run deploy ${{ env.SERVICE_NAME }} \
-                    --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-                    --region ${{ env.REGION }} \
-                    --platform managed \
-                    --allow-unauthenticated \
-                    --port 8000 \
-                    --service-account f1-agent-runner@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
-                    --cpu-boost \
-                    --min-instances 0 \
-                    --max-instances 2 \
-                    --memory 512Mi \
-                    --timeout 300 \
-                    --set-env-vars "PYTHONIOENCODING=utf-8,PYTHONUTF8=1,LANG=C.UTF-8,LC_ALL=C.UTF-8" \
-                    --set-secrets "GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest"
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-            - name: Verify deployment
-              run: |
-                  SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
-                  echo "Service URL: $SERVICE_URL"
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest \
+            .
 
-                  for i in 1 2 3; do
-                    echo "Health check attempt $i..."
-                    if curl -sf "$SERVICE_URL/health" > /dev/null; then
-                      echo "Health check passed!"
-                      exit 0
-                    fi
-                    sleep 10
-                  done
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
 
-                  echo "Health check failed after 3 attempts"
-                  exit 1
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8000 \
+            --service-account f1-agent-runner@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --cpu-boost \
+            --min-instances 0 \
+            --max-instances 2 \
+            --memory 512Mi \
+            --timeout 300 \
+            --set-env-vars "PYTHONIOENCODING=utf-8,PYTHONUTF8=1,LANG=C.UTF-8,LC_ALL=C.UTF-8" \
+            --set-secrets "GOOGLE_API_KEY=f1-agent-google-api-key:latest,QDRANT_URL=f1-agent-qdrant-url:latest,QDRANT_API_KEY=f1-agent-qdrant-api-key:latest"
 
-    # ---------------------------------------------------------------------------
-    # Deploy Frontend to Firebase Hosting - Parallel with Backend
-    # ---------------------------------------------------------------------------
-    deploy-frontend:
-        name: Deploy Frontend
-        runs-on: ubuntu-latest
-        needs: [lint, test-unit, test-integration]
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
+          echo "Service URL: $SERVICE_URL"
 
-        steps:
-            - uses: actions/checkout@v4
+          for i in 1 2 3; do
+            echo "Health check attempt $i..."
+            if curl -sf "$SERVICE_URL/health" > /dev/null; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            sleep 10
+          done
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: ${{ env.NODE_VERSION }}
-                  cache: "npm"
-                  cache-dependency-path: frontend/package-lock.json
+          echo "Health check failed after 3 attempts"
+          exit 1
 
-            - name: Install dependencies
-              working-directory: frontend
-              run: npm ci
+  # ---------------------------------------------------------------------------
+  # Deploy Frontend to Firebase Hosting - Parallel with Backend
+  # ---------------------------------------------------------------------------
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-integration]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
-            - name: Build production bundle
-              working-directory: frontend
-              run: npm run build
-              env:
-                  VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Deploy to Firebase Hosting
-              uses: FirebaseExtended/action-hosting-deploy@v0
-              with:
-                  repoToken: ${{ secrets.GITHUB_TOKEN }}
-                  firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-                  channelId: live
-                  projectId: ${{ env.PROJECT_ID }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build production bundle
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: ${{ env.PROJECT_ID }}
