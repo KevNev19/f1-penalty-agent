@@ -187,7 +187,7 @@ export const ChatInterface: React.FC = () => {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Type your question..."
                         disabled={isLoading}
-                        className="w-full bg-f1-black/50 border border-f1-grey/30 focus:border-f1-red rounded-full px-5 py-3 text-white placeholder-f1-silver/30 transition-all font-medium focus:outline-none focus:ring-1 focus:ring-f1-red/50 focus:bg-f1-black/80"
+                        className="w-full bg-f1-black border border-f1-grey/50 focus:border-f1-red rounded-full px-5 py-3 text-white placeholder-gray-400 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-f1-red/50 focus:bg-f1-black shadow-inner"
                     />
                     <button
                         type="submit"
