@@ -29,7 +29,9 @@ class ApiService {
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const url = `${this.baseUrl}${endpoint}`;
+        // Remove trailing slash from baseUrl if present to avoid double slashes
+        const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
+        const url = `${cleanBaseUrl}${endpoint}`;
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers,

@@ -44,11 +44,13 @@ async def readiness_check() -> HealthResponse:
 
         total = regs + stewards + race
         vs_status = f"connected ({total} docs: {regs} regs, {stewards} decisions, {race} race)"
+        status = "ready"
     except Exception as e:
         vs_status = f"error: {str(e)}"
+        status = "degraded"
 
     return HealthResponse(
-        status="ready",
+        status=status,
         version="1.0.0",
         vector_store=vs_status,
     )
