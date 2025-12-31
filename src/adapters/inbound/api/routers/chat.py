@@ -38,6 +38,15 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
         agent = get_agent()
         normalized_question = normalize_text(request.question)
 
+        # Validate minimum input length for meaningful processing
+        if len(normalized_question.strip()) < 3:
+            return AnswerResponse(
+                answer="I need a bit more context to help you. Could you ask about a specific F1 penalty, regulation, or race incident?",
+                sources=[],
+                question=normalized_question,
+                model_used="gemini-2.0-flash",
+            )
+
         # Convert API messages to Domain messages
         history = [DomainChatMessage(role=m.role, content=m.content) for m in request.messages]
 

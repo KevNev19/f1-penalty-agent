@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import { ChatInterface } from './components/ChatInterface';
 import { AdminPage } from './pages/AdminPage';
+import { ChatProvider } from './context/ChatContext';
 
 // Wrapper component to handle back navigation logic
 const AdminPageWrapper = () => {
@@ -80,7 +81,9 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <ChatProvider>
+        <AppContent />
+      </ChatProvider>
     </BrowserRouter>
   );
 }

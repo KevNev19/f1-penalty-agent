@@ -2,7 +2,7 @@
 
 Your official AI Race Engineer for Formula 1 - get real-time insights on penalties, regulations, and race strategy using RAG (Retrieval-Augmented Generation) with official FIA documents.
 
-![PitWallAI Interface](frontend/public/bg-track.png)
+![PitWallAI Logo](frontend/public/pitwall-ai-logo.jpg)
 
 ## ✨ Features
 

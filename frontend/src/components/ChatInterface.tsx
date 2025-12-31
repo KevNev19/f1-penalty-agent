@@ -1,17 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, type SourceInfo } from '../services/api';
-
-interface Message {
-    role: 'user' | 'agent';
-    content: string;
-    sources?: SourceInfo[];
-    isLoading?: boolean;
-}
+import { api } from '../services/api';
+import { useChat, type Message } from '../context/ChatContext';
 
 export const ChatInterface: React.FC = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const { messages, setMessages, clearMessages } = useChat();
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -72,7 +66,16 @@ export const ChatInterface: React.FC = () => {
                 <span className="text-xs font-black uppercase tracking-widest text-white italic">
                     PitWall Live Feed // Session Active
                 </span>
-                <div className="flex space-x-1">
+                <div className="flex items-center gap-3">
+                    {messages.length > 0 && (
+                        <button
+                            onClick={clearMessages}
+                            className="text-[10px] font-bold uppercase tracking-wide text-white/70 hover:text-white bg-black/30 hover:bg-black/50 px-2 py-1 rounded transition-colors"
+                            title="Clear chat history"
+                        >
+                            Clear
+                        </button>
+                    )}
                     <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                 </div>
             </div>
