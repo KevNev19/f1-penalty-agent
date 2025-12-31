@@ -9,11 +9,15 @@ from ..domain.utils import normalize_text
 from ..ports.analytics_port import AnalyticsPort
 from ..ports.llm_port import LLMPort
 from .prompts import (
+    ANALYTICS_PROMPT,
+    DECLINED_RESPONSE,
     F1_SYSTEM_PROMPT,
     GENERAL_F1_PROMPT,
+    GREETING_RESPONSE,
     PENALTY_EXPLANATION_PROMPT,
     QUERY_REWRITE_PROMPT,
     RULE_LOOKUP_PROMPT,
+    THANKS_RESPONSE,
 )
 from .retrieval_service import RetrievalService
 
@@ -254,7 +258,33 @@ class AgentService:
         if messages:
             search_query = self.contextualize_query(query, messages)
 
-        # Classify the query (use original or rewritten? search_query is safer for classification too)
+            # Handle special conversation markers
+            if search_query == "[DECLINED]":
+                logger.debug("User declined follow-up, returning acknowledgment")
+                return AgentResponse(
+                    answer=DECLINED_RESPONSE,
+                    query_type=QueryType.GENERAL,
+                    sources_used=[],
+                    context=RetrievalContext([], [], []),
+                )
+            elif search_query == "[THANKS]":
+                logger.debug("User expressed gratitude, returning thanks response")
+                return AgentResponse(
+                    answer=THANKS_RESPONSE,
+                    query_type=QueryType.GENERAL,
+                    sources_used=[],
+                    context=RetrievalContext([], [], []),
+                )
+            elif search_query == "[GREETING]":
+                logger.debug("User sent greeting, returning welcome response")
+                return AgentResponse(
+                    answer=GREETING_RESPONSE,
+                    query_type=QueryType.GENERAL,
+                    sources_used=[],
+                    context=RetrievalContext([], [], []),
+                )
+
+        # Classify the query
         query_type = self.classify_query(search_query)
         logger.debug("Query type: %s", query_type.value)
 
@@ -266,19 +296,19 @@ class AgentService:
         logger.debug("Searching knowledge base...")
         context = self.retriever.retrieve(search_query, top_k=5, query_context=query_context)
 
-        # Build prompt using ORIGINAL query content (or search query? usually original is better for LLM but search for retrieval)
-        # Actually, if we rewrite "When did he..." to "When did Hamilton...", we should probably use the rewritten one for generation too
-        # so the model knows who "he" is if the retrieval context didn't make it obvious (though retrieval context should have Hamilton docs).
-        # Let's use search_query for prompt too to be safe.
-        # Let's use search_query for prompt too to be safe.
-        prompt = self.build_prompt(search_query, query_type, context)
-
-        # Inject Analytics Data if applicable
+        # Handle Analytics queries with dedicated prompt
         if query_type == QueryType.ANALYTICS and self.stats_repo:
             logger.debug("Generating SQL for analytics...")
             analytics_data = self._generate_sql_and_query(search_query)
-            if analytics_data:
-                prompt += f"\n\n=== STATISTICAL DATA (From Database) ===\n{analytics_data}\n\nUse this data to provide a precise answer."
+            context_str = context.get_combined_context()
+            prompt = ANALYTICS_PROMPT.format(
+                stats_data=analytics_data if analytics_data else "No data found in database.",
+                context=context_str,
+                question=search_query,
+            )
+        else:
+            # Use standard prompt for non-analytics queries
+            prompt = self.build_prompt(search_query, query_type, context)
 
         # Generate response
         logger.debug("Generating response...")
