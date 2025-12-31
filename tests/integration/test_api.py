@@ -126,5 +126,5 @@ class TestAPIDocumentation:
 
         assert response.status_code == 200
         schema = response.json()
-        assert schema["info"]["title"] == "F1 Penalty Agent API"
+        assert schema["info"]["title"] == "PitWallAI API"
         assert "/api/v1/ask" in schema["paths"]
