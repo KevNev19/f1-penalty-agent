@@ -7,6 +7,7 @@
 │                   Primary Adapters (Inbound)                │
 │        (CLI: src/adapters/inbound/cli)                      │
 │        (API: src/adapters/inbound/api)                      │
+│        (Frontend: frontend/ - React + Vite)                 │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -39,11 +40,12 @@
 ### Prerequisites
 
 - Python 3.12+ (a `.python-version` file pins 3.12.12 for pyenv users)
-- Poetry
+- Node.js 18+ (for frontend development)
+- Poetry (Python dependency management)
 - Google AI API key
 - Qdrant Cloud account (free tier)
 
-### Install
+### Backend Setup
 
 ```bash
 # Install dependencies
@@ -52,6 +54,23 @@ poetry install
 # Set up environment
 cp .env.example .env
 # Add GOOGLE_API_KEY, QDRANT_URL, and QDRANT_API_KEY
+
+# Start API server
+poetry run uvicorn src.adapters.inbound.api.main:app --reload
+# API available at http://localhost:8000
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+# UI available at http://localhost:5173
 ```
 
 ### Run Tests
@@ -70,19 +89,24 @@ poetry run pytest tests/ -v
 ### Linting
 
 ```bash
-# Check for errors
+# Python - Check for errors
 poetry run ruff check src/ tests/
 
-# Auto-fix
+# Python - Auto-fix
 poetry run ruff check src/ tests/ --fix
 
-# Check formatting
+# Python - Check formatting
 poetry run ruff format src/ tests/ --check
+
+# Frontend - Lint
+cd frontend && npm run lint
 ```
 
 ## Key Components
 
-### QdrantAdapter (`src/adapters/outbound/vector_store/qdrant_adapter.py`)
+### Backend Components
+
+#### QdrantAdapter (`src/adapters/outbound/vector_store/qdrant_adapter.py`)
 
 - **Gemini Embeddings**: 768-dim vectors via Google API
 - **Collections**: Separate storage for regulations, stewards_decisions, race_data
@@ -90,25 +114,50 @@ poetry run ruff format src/ tests/ --check
 - **Auto-collection creation**: Creates collections on first use
 - **API**: Uses `query_points` (qdrant-client 1.16+)
 
-### CrossEncoderReranker (`src/core/services/reranker.py`)
+#### CrossEncoderReranker (`src/core/services/reranker.py`)
 
 - **MS MARCO MiniLM**: Optimized for passage re-ranking
 - **Lazy loading**: Model loaded on first use
 - **Precision boost**: +15-20% improvement
 - **Note**: Disabled on Windows due to torch DLL issues
 
-### RetrievalService (`src/core/services/retrieval_service.py`)
+#### RetrievalService (`src/core/services/retrieval_service.py`)
 
 - **Query expansion**: F1-specific synonyms
 - **Keyword boosting**: Exact match scoring
 - **Deduplication**: Removes redundant results
 
-### Common Utilities (`src/core/domain/utils.py`)
+#### Common Utilities (`src/core/domain/utils.py`)
 
 Shared helper functions used across CLI, API, and LLM:
 
 - **`sanitize_text(text)`**: Removes BOM and non-ASCII characters for API-safe text
 - **`chunk_text(text, chunk_size, overlap)`**: Splits text into overlapping chunks (1500 chars, 200 overlap) for better vector search
+
+### Frontend Components
+
+#### ChatInterface (`frontend/src/components/ChatInterface.tsx`)
+
+Main chat component with F1 radio-style design:
+- Message cards styled as "DRIVER" (user) and "RACE ENGINEER" (AI)
+- Loading state with animated bouncing dots
+- Markdown rendering with remark-gfm
+- Source citations with clickable links
+- Auto-scroll to latest messages
+
+#### Navbar (`frontend/src/components/Navbar.tsx`)
+
+Top navigation bar:
+- PitWallAI logo display
+- Glassmorphism background effect
+- Responsive design
+
+#### API Service (`frontend/src/services/api.ts`)
+
+TypeScript API client:
+- `askQuestion(question, history)` - Send question with conversation history
+- `checkHealth()` - Backend health check
+- `checkReadiness()` - Backend readiness probe
 
 ### FastAPI Backend (`src/adapters/inbound/api/`)
 
@@ -130,6 +179,25 @@ Shared helper functions used across CLI, API, and LLM:
 | `f1agent ask "..."` | Ask a single question |
 | `f1agent chat` | Interactive chat session |
 
+## Frontend Design System
+
+### Color Palette
+
+```css
+/* Tailwind config extends */
+f1-red: '#E10600'    /* Primary accent */
+f1-black: '#15151E'  /* Backgrounds */
+f1-grey: '#38383F'   /* Secondary backgrounds */
+f1-silver: '#F0F0F0' /* Light text */
+```
+
+### Key UI Patterns
+
+- **Glassmorphism**: `backdrop-blur-md bg-white/10 border border-white/20`
+- **F1 Message Cards**: Rounded corners, left border accent, shadow
+- **Radio-style Headers**: "DRIVER" and "RACE ENGINEER" labels
+- **Live Indicators**: Animated pulse dots
+
 ## Environment Variables
 
 | Variable | Description | Required | Default |
@@ -138,6 +206,7 @@ Shared helper functions used across CLI, API, and LLM:
 | `QDRANT_URL` | Qdrant Cloud cluster URL | Yes | - |
 | `QDRANT_API_KEY` | Qdrant Cloud API key | Yes | - |
 | `LLM_MODEL` | Gemini model | No | gemini-2.0-flash |
+| `VITE_API_BASE_URL` | API URL for frontend | No | http://localhost:8000 |
 
 ## CI/CD Workflows
 
@@ -158,6 +227,16 @@ Shared helper functions used across CLI, API, and LLM:
 - **Jobs**: Build package → Create release
 
 ## Deployment
+
+### Running Both Services Locally
+
+```bash
+# Terminal 1: Backend
+poetry run uvicorn src.adapters.inbound.api.main:app --reload
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
 
 ### Cloud Run (Automated)
 
