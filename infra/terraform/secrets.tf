@@ -76,3 +76,25 @@ output "qdrant_api_key_secret" {
   value       = google_secret_manager_secret.qdrant_api_key.secret_id
 }
 
+# =============================================================================
+# GitHub Secrets (synced to GitHub via sync-secrets.yml workflow)
+# =============================================================================
+
+# Firebase service account key for GitHub Actions to deploy to Firebase Hosting
+# Note: The secret version is created manually via gcloud, not Terraform,
+# because the key is generated separately
+resource "google_secret_manager_secret" "github_firebase_sa" {
+  secret_id = "github-firebase-service-account"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}
+
+resource "google_secret_manager_secret_iam_member" "github_firebase_sa_access" {
+  secret_id = google_secret_manager_secret.github_firebase_sa.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.f1_agent.email}"
+}
