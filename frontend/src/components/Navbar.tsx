@@ -1,35 +1,34 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const Navbar: React.FC = () => {
+    const location = useLocation();
+
     return (
-        <nav className="fixed top-0 left-0 w-full z-50 bg-f1-dark/90 backdrop-blur-md border-b border-f1-red/30 px-6 py-4">
+        <nav className="fixed top-0 left-0 w-full z-50 bg-f1-black/95 backdrop-blur-md border-b border-f1-red/30 px-6 py-4 shadow-lg">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 {/* Logo Section */}
-                <div className="flex items-center space-x-2">
-                    <div className="bg-f1-red text-white py-1 px-3 font-bold text-xl f1-slant transform skew-x-[-15deg] flex items-center">
+                <Link to="/" className="flex items-center space-x-2 group">
+                    <div className="bg-f1-red text-white py-1 px-3 font-bold text-xl f1-slant transform skew-x-[-15deg] flex items-center group-hover:bg-red-600 transition-colors">
                         <span className="transform skew-x-[15deg]">PitWall</span>
                     </div>
                     <span className="text-white font-bold text-xl tracking-tighter">AI</span>
-                </div>
+                </Link>
 
                 {/* Navigation Links */}
-                <div className="hidden md:flex items-center space-x-8">
-                    <a href="#" className="text-f1-silver hover:text-white transition-colors uppercase text-sm font-bold tracking-widest border-b-2 border-transparent hover:border-f1-red pb-1">
-                        Regulations
-                    </a>
-                    <a href="#" className="text-f1-silver hover:text-white transition-colors uppercase text-sm font-bold tracking-widest border-b-2 border-transparent hover:border-f1-red pb-1">
-                        Penalties
-                    </a>
-                    <a href="#" className="text-f1-silver hover:text-white transition-colors uppercase text-sm font-bold tracking-widest border-b-2 border-transparent hover:border-f1-red pb-1">
-                        Archive
-                    </a>
-                </div>
-
-                {/* Call to Action */}
-                <div>
-                    <button className="bg-f1-red hover:bg-red-700 text-white px-6 py-2 rounded-sm font-bold uppercase text-xs tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-f1-red/20">
-                        Launch Agent
-                    </button>
+                <div className="flex items-center space-x-6">
+                    <Link
+                        to="/"
+                        className={`text-sm font-bold uppercase tracking-widest transition-all hover:text-white ${location.pathname === '/' ? 'text-white border-b-2 border-f1-red' : 'text-f1-silver border-b-2 border-transparent'}`}
+                    >
+                        Assistant
+                    </Link>
+                    <Link
+                        to="/admin"
+                        className={`text-sm font-bold uppercase tracking-widest transition-all hover:text-white ${location.pathname === '/admin' ? 'text-white border-b-2 border-f1-red' : 'text-f1-silver border-b-2 border-transparent'}`}
+                    >
+                        System Status
+                    </Link>
                 </div>
             </div>
         </nav>

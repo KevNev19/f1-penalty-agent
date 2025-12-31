@@ -3,6 +3,13 @@
 from pydantic import BaseModel, Field
 
 
+class ChatMessage(BaseModel):
+    """A single message in the chat history."""
+
+    role: str = Field(..., description="Role of the message sender (user, agent)")
+    content: str = Field(..., description="Content of the message")
+
+
 class QuestionRequest(BaseModel):
     """Request model for asking a question."""
 
@@ -15,6 +22,10 @@ class QuestionRequest(BaseModel):
             "example": "Why did Max Verstappen get a penalty at the 2024 Austrian GP?"
         },
     )
+    messages: list[ChatMessage] = Field(
+        default_factory=list,
+        description="Chat history for context",
+    )
 
 
 class SourceInfo(BaseModel):
@@ -24,6 +35,7 @@ class SourceInfo(BaseModel):
     doc_type: str = Field(..., description="Type of document (regulation, stewards, race_data)")
     relevance_score: float = Field(..., ge=0, le=1, description="Relevance score from retrieval")
     excerpt: str | None = Field(None, description="Short excerpt from the source")
+    url: str | None = Field(None, description="URL to the source document")
 
 
 class AnswerResponse(BaseModel):

@@ -33,9 +33,17 @@ async def readiness_check() -> HealthResponse:
     """
     try:
         vector_store = get_vector_store()
-        # Try to get stats to verify connectivity
-        stats = vector_store.get_collection_stats(vector_store.REGULATIONS_COLLECTION)
-        vs_status = f"connected ({stats.get('count', 0)} regulations)"
+        # Aggregate stats from all collections
+        regs = vector_store.get_collection_stats(vector_store.REGULATIONS_COLLECTION).get(
+            "count", 0
+        )
+        stewards = vector_store.get_collection_stats(vector_store.STEWARDS_COLLECTION).get(
+            "count", 0
+        )
+        race = vector_store.get_collection_stats(vector_store.RACE_DATA_COLLECTION).get("count", 0)
+
+        total = regs + stewards + race
+        vs_status = f"connected ({total} docs: {regs} regs, {stewards} decisions, {race} race)"
     except Exception as e:
         vs_status = f"error: {str(e)}"
 

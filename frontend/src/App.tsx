@@ -1,48 +1,77 @@
-import Navbar from './components/Navbar'
-import PenaltyAgent from './components/PenaltyAgent'
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import { ChatInterface } from './components/ChatInterface';
+import { AdminPage } from './pages/AdminPage';
 
-function App() {
+// Wrapper component to handle back navigation logic
+const AdminPageWrapper = () => {
+  const navigate = useNavigate();
+  return <AdminPage onBack={() => navigate('/')} />;
+};
+
+// Home component to isolate verify home view
+const Home = () => (
+  <>
+    <div className="text-center mb-8 animate-fade-in-down">
+      <h1 className="text-5xl font-black italic mb-2 tracking-tighter">
+        <span className="text-f1-red">FIA</span> REGULATION <span className="text-white">ASSISTANT</span>
+      </h1>
+      <p className="text-f1-silver text-lg font-medium max-w-2xl mx-auto">
+        Real-time analysis of penalties, regulations, and stewards' decisions.
+      </p>
+      <div className="mt-4 flex justify-center">
+        <span className="text-f1-red font-bold uppercase tracking-[0.2em] text-sm">Official Regulation Assistant</span>
+      </div>
+    </div>
+
+    <ChatInterface />
+
+    <div className="fixed bottom-4 right-4 z-50">
+      <Link
+        to="/admin"
+        className="bg-black/80 border border-f1-grey/30 hover:border-f1-red hover:bg-f1-red/10 text-f1-silver text-[10px] font-mono p-2 rounded uppercase tracking-widest backdrop-blur transition-all inline-block"
+      >
+        System Status
+      </Link>
+    </div>
+  </>
+);
+
+function AppContent() {
+  const location = useLocation();
+  const isChatView = location.pathname === '/';
+
   return (
-    <div className="min-h-screen bg-f1-dark text-white pt-24 overflow-x-hidden">
+    <div className="min-h-screen bg-f1-black text-white bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-f1-grey/20 via-f1-black to-f1-black">
       <Navbar />
 
-      {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="relative">
-          {/* Decorative Background Elements */}
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-f1-red/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
-
-          <div className="flex flex-col items-center text-center">
-            {/* Left Content */}
-            <div className="max-w-4xl">
-              <div className="inline-block border-l-4 border-f1-red pl-4 mb-4">
-                <span className="text-f1-red font-bold uppercase tracking-[0.2em] text-sm">Official Strategic Assistant</span>
-              </div>
-
-              <h1 className="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-tight mb-6">
-                Master the <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-f1-red to-red-400">
-                  Regulations
-                </span>
-              </h1>
-
-              <p className="text-xl text-f1-silver max-w-2xl mx-auto mb-10 font-medium">
-                Real-time analysis of FIA Stewards' decisions, penalty precedents, and race regulations. Powered by PitWallAI.
-              </p>
-            </div>
-
-            {/* Main Interactive Component */}
-            <PenaltyAgent />
-          </div>
-        </div>
+      <main className="container mx-auto px-4 pt-24 pb-12">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/admin" element={<AdminPageWrapper />} />
+        </Routes>
       </main>
+
+      {isChatView && (
+        <footer className="fixed bottom-0 w-full text-center py-4 text-f1-silver/40 text-[10px] pointer-events-none">
+          Not officially affiliated with Formula 1 or the FIA. Data for educational purposes only.
+        </footer>
+      )}
 
       {/* Dynamic Background Grid */}
       <div className="fixed inset-0 pointer-events-none -z-20 opacity-20"
         style={{ backgroundImage: 'linear-gradient(#38383f 1px, transparent 1px), linear-gradient(90deg, #38383f 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
+}
+
+export default App;

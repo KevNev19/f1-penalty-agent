@@ -26,6 +26,14 @@ class QueryType(Enum):
 
 
 @dataclass
+class ChatMessage:
+    """A single message in the chat history."""
+
+    role: str
+    content: str
+
+
+@dataclass
 class RetrievalContext:
     """Context retrieved for answering a question.
 

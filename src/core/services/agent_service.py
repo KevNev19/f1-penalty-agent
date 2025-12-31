@@ -11,6 +11,7 @@ from .prompts import (
     F1_SYSTEM_PROMPT,
     GENERAL_F1_PROMPT,
     PENALTY_EXPLANATION_PROMPT,
+    QUERY_REWRITE_PROMPT,
     RULE_LOOKUP_PROMPT,
 )
 from .retrieval_service import RetrievalService
@@ -123,45 +124,96 @@ class AgentService:
         """Remove BOM and other problematic Unicode characters."""
         return normalize_text(str(text) if text else "")
 
-    def get_sources(self, context: RetrievalContext) -> list[str]:
+    def get_sources(self, context: RetrievalContext) -> list[dict]:
         """Extract source citations from context.
 
         Args:
             context: Retrieved context.
 
         Returns:
-            List of source descriptions.
+            List of source dictionaries with metadata.
         """
         sources = []
+        seen_keys = set()
 
         for result in context.regulations[:3]:
-            source = self._sanitize_text(result.document.metadata.get("source", "FIA Regulations"))
-            if source and source not in sources:
-                sources.append(f"[Source] {source}")
+            title = self._sanitize_text(result.document.metadata.get("source", "FIA Regulations"))
+            url = result.document.metadata.get("url")
+            key = f"{title}_{url}"
+            if title and key not in seen_keys:
+                seen_keys.add(key)
+                sources.append(
+                    {
+                        "source": title,
+                        "doc_type": "regulation",
+                        "score": result.score,
+                        "excerpt": result.document.metadata.get("excerpt"),  # Extract if available
+                        "url": url,
+                    }
+                )
 
         for result in context.stewards_decisions[:3]:
             event = self._sanitize_text(result.document.metadata.get("event", "Unknown"))
             source = self._sanitize_text(
                 result.document.metadata.get("source", "Stewards Decision")
             )
-            desc = f"[Stewards] {source} ({event})"
-            if desc not in sources:
-                sources.append(desc)
+            url = result.document.metadata.get("url")
+            title = f"{source} ({event})"
+            key = f"{title}_{url}"
+
+            if title and key not in seen_keys:
+                seen_keys.add(key)
+                sources.append(
+                    {"source": title, "doc_type": "stewards", "score": result.score, "url": url}
+                )
 
         for result in context.race_data[:3]:
             race = self._sanitize_text(result.document.metadata.get("race", "Race") or "Race")
-            season = result.document.metadata.get("season", "")  # season is int, no sanitization
-            desc = f"[Race Control] {race} {season}"
-            if desc not in sources:
-                sources.append(desc)
+            season = result.document.metadata.get("season", "")
+            title = f"{race} {season}"
+            url = result.document.metadata.get("url")
+            key = f"{title}_{url}"
+
+            if title and key not in seen_keys:
+                seen_keys.add(key)
+                sources.append(
+                    {"source": title, "doc_type": "race_control", "score": result.score, "url": url}
+                )
 
         return sources
 
-    def ask(self, query: str, stream: bool = False) -> AgentResponse:
+    def contextualize_query(self, query: str, messages: list[object]) -> str:
+        """Rewrite query to include context from history if needed.
+
+        Args:
+            query: User's follow-up question.
+            messages: Chat history (list of domain.ChatMessage).
+
+        Returns:
+            Rewritten query or original if no history.
+        """
+        if not messages:
+            return query
+
+        # Format history for prompt
+        history_str = ""
+        for msg in messages[-6:]:  # Keep last 3 turns
+            history_str += f"{msg.role}: {msg.content}\n"
+
+        prompt = QUERY_REWRITE_PROMPT.format(history=history_str, question=query)
+        logger.debug("Contextualizing query...")
+        rewritten = self.llm.generate(prompt)
+        logger.debug("Rewritten query: %s", rewritten)
+        return rewritten.strip()
+
+    def ask(
+        self, query: str, messages: list[object] | None = None, stream: bool = False
+    ) -> AgentResponse:
         """Ask a question and get a response.
 
         Args:
             query: User's question about F1 penalties/rules.
+            messages: Optional chat history for context.
             stream: Whether to stream the response (not used in basic version).
 
         Returns:
@@ -177,20 +229,28 @@ class AgentService:
         # in Cloud Run where stdout may have limited encoding support
         logger.debug("Analyzing question...")
 
-        # Classify the query
-        query_type = self.classify_query(query)
+        # Contextualize query if history exists
+        search_query = query
+        if messages:
+            search_query = self.contextualize_query(query, messages)
+
+        # Classify the query (use original or rewritten? search_query is safer for classification too)
+        query_type = self.classify_query(search_query)
         logger.debug("Query type: %s", query_type.value)
 
-        # Extract context hints (driver, race, etc.)
-        query_context = self.retriever.extract_race_context(query)
+        # Extract context hints (driver, race, etc.) from SEARCH QUERY
+        query_context = self.retriever.extract_race_context(search_query)
         logger.debug("Detected context: %s", query_context)
 
-        # Retrieve relevant documents
+        # Retrieve relevant documents using SEARCH QUERY
         logger.debug("Searching knowledge base...")
-        context = self.retriever.retrieve(query, top_k=5, query_context=query_context)
+        context = self.retriever.retrieve(search_query, top_k=5, query_context=query_context)
 
-        # Build prompt
-        prompt = self.build_prompt(query, query_type, context)
+        # Build prompt using ORIGINAL query content (or search query? usually original is better for LLM but search for retrieval)
+        # Actually, if we rewrite "When did he..." to "When did Hamilton...", we should probably use the rewritten one for generation too
+        # so the model knows who "he" is if the retrieval context didn't make it obvious (though retrieval context should have Hamilton docs).
+        # Let's use search_query for prompt too to be safe.
+        prompt = self.build_prompt(search_query, query_type, context)
 
         # Generate response
         logger.debug("Generating response...")

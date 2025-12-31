@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from .....core.domain.agent import ChatMessage as DomainChatMessage
 from .....core.domain.utils import normalize_text
 from ..deps import get_agent
 from ..models import AnswerResponse, ErrorResponse, QuestionRequest, SourceInfo
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-async def ask_question(request: QuestionRequest) -> AnswerResponse:
+def ask_question(request: QuestionRequest) -> AnswerResponse:
     """Ask a question about F1 penalties or regulations.
 
     Args:
@@ -37,8 +38,11 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
         agent = get_agent()
         normalized_question = normalize_text(request.question)
 
+        # Convert API messages to Domain messages
+        history = [DomainChatMessage(role=m.role, content=m.content) for m in request.messages]
+
         # Get response from the agent
-        response = agent.ask(normalized_question)
+        response = agent.ask(normalized_question, messages=history)
 
         # Convert sources to SourceInfo objects
         sources = []
@@ -59,6 +63,7 @@ async def ask_question(request: QuestionRequest) -> AnswerResponse:
                         doc_type=source.get("doc_type", "unknown"),
                         relevance_score=source.get("score", 0.0),
                         excerpt=source.get("excerpt") or "",
+                        url=source.get("url"),
                     )
                 )
 
