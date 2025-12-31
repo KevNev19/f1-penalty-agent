@@ -126,7 +126,7 @@ jobs:
           PYTHONPATH: .
 
   # ---------------------------------------------------------------------------
-  # Docker Build Test - Parallel with Integration Tests
+  # Docker Build - Build once, cache for deploy
   # ---------------------------------------------------------------------------
   docker-build:
     name: Docker Build
@@ -138,14 +138,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build and cache Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
-          tags: pitwall-api:${{ github.sha }}
+          load: true
+          tags: |
+            pitwall-api:${{ github.sha }}
+            pitwall-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Save Docker image to artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: docker save pitwall-api:${{ github.sha }} | gzip > image.tar.gz
+
+      - name: Upload Docker image artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar.gz
+          retention-days: 1
 
   # =============================================================================
   # INFRASTRUCTURE STAGE - Runs plan on every main push, apply only if changes
@@ -298,12 +313,16 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build Docker image
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load and tag Docker image
         run: |
-          docker build \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest \
-            .
+          gunzip -c image.tar.gz | docker load
+          docker tag pitwall-api:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker tag pitwall-api:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
 
       - name: Push Docker image
         run: |
