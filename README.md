@@ -33,7 +33,14 @@ Your official AI Race Engineer for Formula 1 - get real-time insights on penalti
 - 🔄 **CI/CD Pipeline** - Automated testing and deployment
 - 📊 **Infrastructure as Code** - Terraform-managed GCP resources
 
-## 🚀 Quick Start
+## � Documentation
+
+- [Developer Guide](DEVELOPER.md) - Architecture, components, and development workflow
+- [Security Policy](SECURITY.md) - Security guidelines and reporting
+- [Infrastructure](infra/terraform/README.md) - Terraform configuration details
+- [Live Updates Roadmap](LIVE-UPDATES-PLAN.md) - Implementation plan for **Real-Time Race Data** and **Seasonal Data Freshness**, enabling the agent to answer questions about ongoing incidents with live context.
+
+## �🚀 Quick Start
 
 ### Prerequisites
 
@@ -238,11 +245,6 @@ poetry run ruff check src/ tests/ --fix
 cd frontend && npm run dev
 ```
 
-## 📖 Documentation
-
-- [Developer Guide](DEVELOPER.md) - Architecture, components, and development workflow
-- [Security Policy](SECURITY.md) - Security guidelines and reporting
-- [Infrastructure](infra/terraform/README.md) - Terraform configuration details
 
 ## 📄 License
 
