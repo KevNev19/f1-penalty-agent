@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """Compare local and Secret Manager API keys after update."""
 
-import hashlib
+import secrets
 import subprocess
 
 from dotenv import dotenv_values
-
-
-def hash_key(key: str) -> str:
-    """Return SHA-256 hash of the key."""
-    if not key:
-        return ""
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()
-
 
 # Get local key
 local = dotenv_values(".env").get("GOOGLE_API_KEY", "")
@@ -33,34 +25,33 @@ result = subprocess.run(
 )
 secret = result.stdout.strip()
 
-local_hash = hash_key(local)
-secret_hash = hash_key(secret)
-
 print("=" * 60)
-print("KEY COMPARISON - Local vs Secret Manager (HASHED)")
+print("KEY COMPARISON - Local vs Secret Manager")
 print("=" * 60)
 
-print("\n=== Local .env ===")
-print(f"Length: {len(local)}")
-print(f"Hash:   {local_hash}")
-print(f"Starts with BOM: {local.startswith(chr(0xFEFF))}")
+# Check for BOM
+local_bom = local.startswith(chr(0xFEFF))
+secret_bom = secret.startswith(chr(0xFEFF))
 
-print("\n=== Secret Manager ===")
-print(f"Length: {len(secret)}")
-print(f"Hash:   {secret_hash}")
-print(f"Starts with BOM: {secret.startswith(chr(0xFEFF))}")
+print(f"\nLocal Key Length:  {len(local)}")
+print(f"Secret Key Length: {len(secret)}")
+print(f"Local has BOM:     {local_bom}")
+print(f"Secret has BOM:    {secret_bom}")
 
 print("\n=== COMPARISON ===")
-if local == secret:
+# Use constant-time comparison to prevent timing attacks
+if secrets.compare_digest(local, secret):
     print("✅ MATCH - Local and Secret Manager keys are identical!")
 else:
     print("❌ MISMATCH")
-    print(f"Local length: {len(local)}, Secret length: {len(secret)}")
 
-    # Check if they match after common cleaning operations
+    # Debugging hints without revealing secrets
+    if len(local) != len(secret):
+        print("  → Length mismatch")
+
     if local.strip() == secret.strip():
-        print("  → Keys match after stripping whitespace")
+        print("  → Keys match after stripping whitespace (check your .env file)")
     elif local.lstrip(chr(0xFEFF)) == secret.lstrip(chr(0xFEFF)):
-        print("  → Keys match after stripping BOM")
+        print("  → Keys match after stripping BOM (Byte Order Mark)")
     else:
         print("  → Keys are fundamentally different")
