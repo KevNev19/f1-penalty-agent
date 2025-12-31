@@ -39,7 +39,7 @@ const Home = () => (
           </span>
         </div>
       </div>
-      <p className="text-white/60 text-xs md:text-sm font-semibold tracking-[0.3em] uppercase mt-1">
+      <p className="w-full text-center text-white/60 text-xs md:text-sm font-semibold tracking-[0.3em] uppercase mt-2">
         Official AI Strategic Assistant
       </p>
     </div>
