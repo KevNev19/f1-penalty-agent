@@ -33,25 +33,11 @@ print("=" * 60)
 local_bom = local.startswith(chr(0xFEFF))
 secret_bom = secret.startswith(chr(0xFEFF))
 
-print(f"\nLocal Key Length:  {len(local)}")
-print(f"Secret Key Length: {len(secret)}")
-print(f"Local has BOM:     {local_bom}")
-print(f"Secret has BOM:    {secret_bom}")
-
 print("\n=== COMPARISON ===")
 # Use constant-time comparison to prevent timing attacks
 if secrets.compare_digest(local, secret):
     print("✅ MATCH - Local and Secret Manager keys are identical!")
 else:
     print("❌ MISMATCH")
-
-    # Debugging hints without revealing secrets
-    if len(local) != len(secret):
-        print("  → Length mismatch")
-
-    if local.strip() == secret.strip():
-        print("  → Keys match after stripping whitespace (check your .env file)")
-    elif local.lstrip(chr(0xFEFF)) == secret.lstrip(chr(0xFEFF)):
-        print("  → Keys match after stripping BOM (Byte Order Mark)")
-    else:
-        print("  → Keys are fundamentally different")
+    print("Check your .env file and Google Secret Manager to ensure they match.")
+    print("Tip: Check for hidden BOM characters or whitespace.")
