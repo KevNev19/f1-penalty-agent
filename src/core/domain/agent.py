@@ -22,6 +22,7 @@ class QueryType(Enum):
 
     PENALTY_EXPLANATION = "penalty_explanation"
     RULE_LOOKUP = "rule_lookup"
+    ANALYTICS = "analytics"
     GENERAL = "general"
 
 

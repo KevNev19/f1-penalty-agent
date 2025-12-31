@@ -183,10 +183,110 @@ class FIAAdapter(RegulationsSourcePort):
 
         return True
 
+    def _get_season_events(self, season: int) -> list[tuple[str, str]]:
+        """Get all events for a season from the FIA website dropdown.
+
+        Args:
+            season: The F1 season year.
+
+        Returns:
+            List of (event_name, event_url) tuples.
+        """
+        events = []
+
+        try:
+            # Use the season-specific URL to get the event dropdown
+            season_url = f"{self.DECISIONS_BASE_URL}/season/season-{season}-2071"
+            response = self.session.get(season_url, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+
+            # Find the event dropdown (facetapi_select_facet_form_2)
+            event_select = soup.find("select", id="facetapi_select_facet_form_2")
+            if event_select:
+                options = event_select.find_all("option")
+                for option in options:
+                    value = option.get("value", "")
+                    text = option.get_text(strip=True)
+                    # Skip "Select" placeholder
+                    if value and text and text != "Select" and "Select" not in text:
+                        # Value is the relative URL path
+                        full_url = urljoin(self.FIA_BASE_URL, value)
+                        events.append((text, full_url))
+
+            console.print(f"  Found {len(events)} events for {season}")
+
+        except requests.RequestException as exc:
+            console.print(f"[yellow]Warning: Could not get event list: {exc}[/]")
+
+        return events
+
+    def _scrape_event_decisions(
+        self, event_name: str, event_url: str, season: int
+    ) -> list[FIADocument]:
+        """Scrape stewards decisions for a specific event.
+
+        Args:
+            event_name: The event/race name.
+            event_url: The URL to the event's documents page.
+            season: The F1 season year.
+
+        Returns:
+            List of FIADocument objects.
+        """
+        documents = []
+
+        try:
+            response = self.session.get(event_url, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+
+            # Find all PDF links
+            all_links = soup.find_all("a", href=re.compile(r"\.pdf$", re.I))
+
+            for link in all_links:
+                href = link.get("href", "")
+                title = link.get_text(strip=True) or href.split("/")[-1]
+
+                # Check for relevant keywords
+                relevant_keywords = [
+                    "infringement",
+                    "decision",
+                    "offence",
+                    "penalty",
+                    "collision",
+                    "unsafe",
+                    "track",
+                    "speeding",
+                    "exclusion",
+                    "disqualif",
+                    "classification",
+                    "scrutineering",
+                ]
+                title_lower = title.lower()
+                href_lower = href.lower()
+
+                if any(kw in title_lower or kw in href_lower for kw in relevant_keywords):
+                    full_url = urljoin(self.FIA_BASE_URL, href)
+
+                    doc = FIADocument(
+                        title=title,
+                        url=full_url,
+                        doc_type="stewards_decision",
+                        event_name=event_name,
+                        season=season,
+                    )
+                    documents.append(doc)
+
+        except requests.RequestException as exc:
+            console.print(f"[yellow]  Warning: Error fetching {event_name}: {exc}[/]")
+
+        return documents
+
     def scrape_stewards_decisions(
         self, season: int = 2025, race_name: str | None = None
     ) -> list[FIADocument]:
-        """Scrape stewards decisions for a season or specific race.
+        """Scrape stewards decisions for all events in a season.
 
         Args:
             season: The F1 season year.
@@ -198,15 +298,45 @@ class FIAAdapter(RegulationsSourcePort):
         console.print(f"[bold blue]Scraping stewards decisions for {season}...[/]")
         documents = []
 
-        # Use the main F1 documents page which lists all recent decisions
-        # The season-specific URL often returns 500 errors
+        # Get all events for the season
+        events = self._get_season_events(season)
+
+        if not events:
+            # Fallback to original method if we can't get event list
+            console.print("[yellow]  Falling back to main page scraping...[/]")
+            return self._scrape_main_page_decisions(season, race_name)
+
+        # Filter to specific race if requested
+        if race_name:
+            race_lower = race_name.lower()
+            events = [(name, url) for name, url in events if race_lower in name.lower()]
+
+        # Iterate through each event
+        for event_name, event_url in events:
+            console.print(f"  [dim]Scraping {event_name}...[/]")
+            event_docs = self._scrape_event_decisions(event_name, event_url, season)
+            documents.extend(event_docs)
+            if event_docs:
+                console.print(f"    Found {len(event_docs)} documents")
+
+        console.print(f"[green]  Total: {len(documents)} stewards decisions[/]")
+        return documents
+
+    def _scrape_main_page_decisions(
+        self, season: int, race_name: str | None = None
+    ) -> list[FIADocument]:
+        """Fallback: Scrape decisions from main page (latest event only).
+
+        This is the original implementation, kept as fallback.
+        """
+        documents = []
+
         try:
             url = self.DECISIONS_BASE_URL
             response = self.session.get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "lxml")
 
-            # Find all PDF links - FIA uses system/files/decision-document/ path
             all_links = soup.find_all("a", href=re.compile(r"\.pdf$", re.I))
 
             for link in all_links:

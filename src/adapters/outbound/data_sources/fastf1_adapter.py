@@ -108,6 +108,7 @@ class FastF1Adapter(RaceDataSourcePort):
                     import re
 
                     car_match = re.search(r"CAR\s*(\d+)", message, re.I)
+                    team = None
                     if car_match:
                         car_number = car_match.group(1)
                         try:
@@ -118,6 +119,7 @@ class FastF1Adapter(RaceDataSourcePort):
                                     "BroadcastName", drv_info.get("FullName", "Unknown")
                                 )
                                 driver = f"{name} ({car_number})"
+                                team = drv_info.get("TeamName")
                             else:
                                 driver = f"Car {car_number}"
                         except Exception:
@@ -130,6 +132,7 @@ class FastF1Adapter(RaceDataSourcePort):
                             PenaltyEvent(
                                 message=message,
                                 driver=driver,
+                                team=team,
                                 time=time if isinstance(time, datetime) else None,
                                 category=category,
                                 session=session_type,

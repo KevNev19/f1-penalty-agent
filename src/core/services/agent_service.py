@@ -6,6 +6,7 @@ from collections.abc import Generator
 
 from ..domain import AgentResponse, QueryType, RetrievalContext
 from ..domain.utils import normalize_text
+from ..ports.analytics_port import AnalyticsPort
 from ..ports.llm_port import LLMPort
 from .prompts import (
     F1_SYSTEM_PROMPT,
@@ -26,15 +27,18 @@ class AgentService:
         self,
         llm_client: LLMPort,
         retriever: RetrievalService,
+        stats_repo: AnalyticsPort | None = None,
     ) -> None:
         """Initialize the agent.
 
         Args:
             llm_client: LLM client for generating responses.
             retriever: Retriever for fetching relevant documents.
+            stats_repo: Optional repository for SQL analytics.
         """
         self.llm = llm_client
         self.retriever = retriever
+        self.stats_repo = stats_repo
 
     def classify_query(self, query: str) -> QueryType:
         """Classify the type of user query.
@@ -89,6 +93,22 @@ class AgentService:
         for pattern in rule_patterns:
             if re.search(pattern, query_lower):
                 return QueryType.RULE_LOOKUP
+
+        # Analytics patterns (stats, counts, lists)
+        analytics_patterns = [
+            r"how many .*penalt",
+            r"count .*penalt",
+            r"total .*penalt",
+            r"list all .*penalt",
+            r"most penalt",
+            r"least penalt",
+            r"statistics",
+            r"stats for",
+        ]
+
+        for pattern in analytics_patterns:
+            if re.search(pattern, query_lower):
+                return QueryType.ANALYTICS
 
         return QueryType.GENERAL
 
@@ -250,7 +270,15 @@ class AgentService:
         # Actually, if we rewrite "When did he..." to "When did Hamilton...", we should probably use the rewritten one for generation too
         # so the model knows who "he" is if the retrieval context didn't make it obvious (though retrieval context should have Hamilton docs).
         # Let's use search_query for prompt too to be safe.
+        # Let's use search_query for prompt too to be safe.
         prompt = self.build_prompt(search_query, query_type, context)
+
+        # Inject Analytics Data if applicable
+        if query_type == QueryType.ANALYTICS and self.stats_repo:
+            logger.debug("Generating SQL for analytics...")
+            analytics_data = self._generate_sql_and_query(search_query)
+            if analytics_data:
+                prompt += f"\n\n=== STATISTICAL DATA (From Database) ===\n{analytics_data}\n\nUse this data to provide a precise answer."
 
         # Generate response
         logger.debug("Generating response...")
@@ -314,3 +342,35 @@ class AgentService:
         """
         response = self.ask(query)
         return response.answer
+
+    def _generate_sql_and_query(self, query: str) -> str:
+        """Generate SQL and execute it to get stats."""
+        if not self.stats_repo:
+            return ""
+
+        # Prompt for SQL generation
+        sql_prompt = (
+            f'You are an expert SQL Data Analyst. Generate a SQLite SELECT query to answer: "{query}"\n'
+            "Table Schema: penalties (id, season, race_name, driver, team, category, message, session)\n"
+            "- ONLY output the raw SQL query. Do not use markdown blocks.\n"
+            "- Use 'WHERE season = 2025' if no season specified, unless context implies otherwise.\n"
+            "- Use LIKE for partial text matches (e.g. driver names).\n"
+            "- Example: SELECT count(*) FROM penalties WHERE driver LIKE '%Lando%' AND season=2025;"
+        )
+
+        try:
+            generated_sql = self.llm.generate(sql_prompt).strip()
+            # Clean up markdown if model adds it
+            generated_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
+
+            logger.debug(f"Generated SQL: {generated_sql}")
+
+            results = self.stats_repo.execute_query(generated_sql)
+
+            if not results:
+                return "No matching records found in database."
+
+            return f"Query: {generated_sql}\nResults: {str(results)}"
+        except Exception as e:
+            logger.error(f"SQL generation/execution failed: {e}")
+            return f"Error retrieving stats: {e}"

@@ -246,3 +246,33 @@ class JolpicaAdapter:
             f"Nationality: {driver.nationality}\n"
             f"Championship Position: P{position} ({points} points)"
         )
+
+    def get_driver_teams_map(self, season: int = 2025) -> dict[str, str]:
+        """Get a mapping of Driver Name -> Team Name for the season.
+
+        Uses the driverStandings endpoint to find the constructor for each driver.
+
+        Args:
+            season: The F1 season year.
+
+        Returns:
+            Dictionary mapping driver Full Name to Team Name.
+        """
+        standings = self.get_driver_standings(season)
+        team_map = {}
+
+        for entry in standings:
+            driver = entry.get("Driver", {})
+            constructors = entry.get("Constructors", [])
+
+            if driver and constructors:
+                full_name = f"{driver.get('givenName', '')} {driver.get('familyName', '')}".strip()
+                # Use the first constructor listed (usually the current one)
+                team_name = constructors[0].get("name", "Unknown")
+                team_map[full_name] = team_name
+
+                # Also map by code for fallback
+                if driver.get("code"):
+                    team_map[driver.get("code")] = team_name
+
+        return team_map

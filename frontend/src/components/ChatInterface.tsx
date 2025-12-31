@@ -66,7 +66,7 @@ export const ChatInterface: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-140px)] max-w-4xl mx-auto backdrop-blur-sm bg-black/20 border border-f1-grey/20 rounded-lg overflow-hidden mt-4 shadow-2xl">
+        <div className="flex flex-col h-full max-w-4xl mx-auto backdrop-blur-md bg-white/10 border border-white/20 rounded-xl overflow-hidden shadow-2xl">
             {/* Header Ribbon */}
             <div className="bg-f1-red px-4 py-2 flex items-center justify-between shadow-lg z-10">
                 <span className="text-xs font-black uppercase tracking-widest text-white italic">
@@ -84,47 +84,78 @@ export const ChatInterface: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                         </svg>
-                        <p className="text-sm font-medium italic">Awaiting telemetry... Ask about penalties or regulations.</p>
+                        <p className="text-sm font-medium italic text-white/50">Awaiting telemetry... Ask about penalties or regulations.</p>
                     </div>
                 )}
 
                 {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
-                        <div
-                            className={`max-w-[90%] md:max-w-[85%] p-4 shadow-md backdrop-blur-sm transition-all duration-300 ${msg.role === 'user'
-                                ? 'bg-f1-red text-white f1-clip-message-user'
-                                : 'bg-f1-black/90 border border-f1-grey/50 text-f1-silver f1-clip-message'
-                                }`}
-                        >
-                            {msg.role === 'agent' && (
-                                <div className="flex items-center space-x-2 mb-3 border-b border-f1-grey/20 pb-2">
-                                    <span className="w-1.5 h-1.5 bg-f1-red rounded-full shadow-[0_0_5px_#e10600]"></span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-f1-red">Race Control</span>
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+                        {/* F1 Radio Message Card */}
+                        <div className={`max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'order-1' : ''}`}>
+                            {/* Radio Header Bar - F1 Broadcast Style */}
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-t-lg ${msg.role === 'user'
+                                ? 'bg-gradient-to-r from-f1-red to-red-700'
+                                : 'bg-gradient-to-r from-slate-200 to-slate-300'
+                                }`}>
+                                {/* Live Indicator */}
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`w-2 h-2 rounded-full ${msg.role === 'user' ? 'bg-white' : 'bg-f1-red'
+                                        } ${msg.isLoading ? 'animate-pulse' : ''} shadow-lg`}></div>
+                                    <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${msg.role === 'user' ? 'text-white' : 'text-slate-800'}`}>
+                                        {msg.role === 'user' ? 'DRIVER' : 'RACE ENGINEER'}
+                                    </span>
                                 </div>
-                            )}
 
-                            {msg.isLoading ? (
-                                <div className="flex space-x-2 h-6 items-center px-2">
-                                    <div className="w-1.5 h-1.5 bg-f1-red rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                                    <div className="w-1.5 h-1.5 bg-f1-red rounded-full animate-bounce"></div>
-                                </div>
-                            ) : (
-                                <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap leading-relaxed 
-                                    prose-p:text-f1-silver prose-p:mb-2 
-                                    prose-headings:text-white prose-headings:font-bold prose-headings:uppercase prose-headings:tracking-tight
-                                    prose-strong:text-white prose-strong:font-black
-                                    prose-a:text-f1-red prose-a:no-underline hover:prose-a:underline
-                                    prose-ul:list-disc prose-ul:pl-4 prose-li:marker:text-f1-red">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {msg.content}
-                                    </ReactMarkdown>
-                                </div>
-                            )}
+                                {/* Separator */}
+                                <div className="flex-1 h-px bg-white/20"></div>
 
-                            {/* Sources Section - Filtered */}
+                                {/* Timestamp Badge */}
+                                <span className={`text-[9px] font-mono px-2 py-0.5 rounded ${msg.role === 'user' ? 'text-white/70 bg-black/30' : 'text-slate-600 bg-slate-400/30'}`}>
+                                    {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                </span>
+                            </div>
+
+                            {/* Message Content Area */}
+                            <div className={`relative px-4 py-3 rounded-b-lg shadow-lg ${msg.role === 'user'
+                                ? 'bg-gradient-to-br from-f1-red/90 to-red-800/90 text-white border-l-4 border-white/50'
+                                : 'bg-gradient-to-br from-white/95 to-slate-100/95 text-slate-900 border-l-4 border-f1-red backdrop-blur-sm'
+                                }`}>
+                                {/* Subtle scan line effect for agent messages */}
+                                {msg.role === 'agent' && !msg.isLoading && (
+                                    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
+                                        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.05)_50%)] bg-[length:100%_4px]"></div>
+                                    </div>
+                                )}
+
+                                {msg.isLoading ? (
+                                    <div className="flex items-center gap-3 py-2">
+                                        <div className="flex space-x-1">
+                                            <div className="w-2 h-2 bg-f1-red rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                            <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                            <div className="w-2 h-2 bg-f1-red rounded-full animate-bounce"></div>
+                                        </div>
+                                        <span className="text-xs text-slate-500 font-medium italic">Analyzing telemetry...</span>
+                                    </div>
+                                ) : (
+                                    <div className={`prose prose-sm max-w-none leading-relaxed
+                                        ${msg.role === 'user'
+                                            ? 'prose-invert prose-p:text-white/95 prose-headings:text-white prose-strong:text-white prose-li:border-white/50'
+                                            : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900 prose-strong:text-slate-900 prose-li:border-f1-red'
+                                        }
+                                        prose-p:mb-2 prose-p:text-sm
+                                        prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight prose-headings:text-base
+                                        prose-a:text-f1-red prose-a:no-underline hover:prose-a:underline
+                                        prose-ul:list-none prose-ul:pl-0 prose-li:pl-4 prose-li:border-l-2 prose-li:mb-1
+                                        prose-code:bg-black/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-f1-red prose-code:text-xs`}>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sources Section - Styled as Data Feed */}
                             {msg.sources && msg.sources.length > 0 && (() => {
-                                // FILTER LOGIC: Exclude race data citations from visual display
                                 const displayableSources = msg.sources.filter(s =>
                                     s.doc_type !== 'race_control' &&
                                     s.doc_type !== 'race_data'
@@ -133,14 +164,17 @@ export const ChatInterface: React.FC = () => {
                                 if (displayableSources.length === 0) return null;
 
                                 return (
-                                    <div className="mt-4 pt-3 border-t border-f1-grey/20">
-                                        <p className="text-[9px] font-black text-f1-silver/50 uppercase tracking-[0.2em] mb-2">Telemetry Checks</p>
-                                        <div className="flex flex-wrap gap-2">
+                                    <div className="bg-black/80 px-3 py-2 border-t border-f1-grey/20">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="w-1 h-1 bg-cyan-400 rounded-full"></div>
+                                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-cyan-400">DATA SOURCES</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
                                             {displayableSources.map((source, sIdx) => {
                                                 const Content = (
-                                                    <span className="flex items-center space-x-1">
-                                                        <span className="truncate max-w-[150px] font-mono">{source.title}</span>
-                                                        {source.url && <span className="text-[10px] opacity-70">↗</span>}
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="truncate max-w-[120px] text-[9px] font-mono">{source.title}</span>
+                                                        {source.url && <span className="text-cyan-400 text-[8px]">↗</span>}
                                                     </span>
                                                 );
 
@@ -151,7 +185,7 @@ export const ChatInterface: React.FC = () => {
                                                             href={source.url}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="flex items-center text-[10px] bg-f1-grey/40 hover:bg-f1-red hover:text-white border border-transparent hover:border-white/20 text-f1-silver/80 px-2 py-1 rounded-sm transition-all duration-200"
+                                                            className="flex items-center bg-slate-800/80 hover:bg-f1-red border border-slate-700 hover:border-f1-red text-white/70 hover:text-white px-2 py-1 rounded transition-all duration-200"
                                                             title={source.excerpt || ""}
                                                         >
                                                             {Content}
@@ -161,7 +195,7 @@ export const ChatInterface: React.FC = () => {
                                                 return (
                                                     <div
                                                         key={sIdx}
-                                                        className="flex items-center text-[10px] bg-f1-grey/20 border border-f1-grey/30 text-f1-silver/60 px-2 py-1 rounded-sm cursor-help"
+                                                        className="flex items-center bg-slate-800/50 border border-slate-700/50 text-white/50 px-2 py-1 rounded"
                                                         title={source.excerpt || ""}
                                                     >
                                                         {Content}

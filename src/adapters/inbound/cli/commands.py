@@ -65,6 +65,7 @@ def handle_cli_error(exc: Exception) -> None:
 def get_agent():
     """Get or create the F1 agent instance."""
     from ....adapters.outbound.llm.gemini_adapter import GeminiAdapter as GeminiClient
+    from ....adapters.outbound.sqlite_adapter import SQLiteAdapter
     from ....adapters.outbound.vector_store.qdrant_adapter import QdrantAdapter as QdrantVectorStore
     from ....config.settings import settings
     from ....core.services.agent_service import AgentService as F1Agent
@@ -94,7 +95,8 @@ def get_agent():
     retriever = F1Retriever(vector_store, use_reranker=False)  # Disable for CLI (slow startup)
     llm = GeminiClient(settings.google_api_key, settings.llm_model)
 
-    return F1Agent(llm, retriever)
+    sql_adapter = SQLiteAdapter()
+    return F1Agent(llm, retriever, sql_adapter)
 
 
 @app.command()
@@ -317,7 +319,7 @@ def _ingest_stewards_decisions(scraper, vector_store, limit: int, season: int) -
         return 0
 
 
-def _ingest_race_data(cache_dir, vector_store, limit: int, season: int) -> int:
+def _ingest_race_data(cache_dir, vector_store, sql_adapter, limit: int, season: int) -> int:
     """Ingest race control data."""
     from ....adapters.outbound.data_sources.fastf1_adapter import FastF1Adapter as FastF1Loader
     from ....core.domain import Document
@@ -339,6 +341,9 @@ def _ingest_race_data(cache_dir, vector_store, limit: int, season: int) -> int:
         driver_map = {d.code: d.name for d in drivers}
         driver_map.update({str(d.number): d.name for d in drivers if d.number})
 
+        # Load Teams
+        team_map = jolpica.get_driver_teams_map(season)
+
         race_docs = []
         for event in events_to_process:
             with console.status(f"[dim]Loading {event}...[/]"):
@@ -351,9 +356,15 @@ def _ingest_race_data(cache_dir, vector_store, limit: int, season: int) -> int:
                             if driver_name and driver_name in driver_map:
                                 driver_name = driver_map[driver_name]
 
+                            # Resolve team
+                            team_name = penalty.team or "Unknown"
+                            if team_name == "Unknown" and driver_name in team_map:
+                                team_name = team_map[driver_name]
+
                             content = normalize_text(
                                 f"Race: {penalty.race_name} ({penalty.session})\n"
                                 f"Driver: {driver_name or 'Unknown'}\n"
+                                f"Team: {team_name}\n"
                                 f"Message: {penalty.message}\n"
                                 f"Category: {penalty.category}"
                             )
@@ -367,11 +378,25 @@ def _ingest_race_data(cache_dir, vector_store, limit: int, season: int) -> int:
                                         ),
                                         "type": "race_control",
                                         "driver": normalize_text(driver_name or ""),
+                                        "team": normalize_text(team_name),
                                         "race": normalize_text(penalty.race_name),
                                         "season": season,
                                     },
                                 )
                             )
+
+                            # Insert into SQL Database
+                            if sql_adapter:
+                                sql_adapter.insert_penalty(
+                                    season=season,
+                                    race_name=penalty.race_name,
+                                    driver=driver_name or "Unknown",
+                                    category=penalty.category,
+                                    message=penalty.message,
+                                    session=penalty.session,
+                                    team=team_name,
+                                )
+
                 except Exception as e:
                     console.print(f"  [dim]Skipped {event}: {e}[/]")
                     continue
@@ -429,9 +454,27 @@ def setup(
             embedding_api_key=settings.google_api_key,
         )
 
+        # Initialize SQL Adapter
+        from ....adapters.outbound.sqlite_adapter import SQLiteAdapter
+
+        sql_adapter = SQLiteAdapter()
+
         if reset:
-            console.print("[yellow]Resetting collections...[/]")
+            console.print("[yellow]Resetting collections and DB...[/]")
             vector_store.reset()
+            sql_adapter.clear_season(season)  # Only clear specific season if reset? Or full clear?
+            # 'reset' implies full reset, but 'season' implies partial setup.
+            # Existing 'vector_store.reset()' clears ALL collections.
+            # So we should probably clear FULL DB if reset is true?
+            # But sql_adapter.clear_season(season) is safer if user just wants to re-index 2025.
+            # Ideally 'f1agent setup' without --reset appends/updates?
+            # Qdrant upserts by ID (safe).
+            # SQLite inserts (duplicates!).
+            # So we MUST clear the season from SQL before ingesting.
+            pass
+
+        # Always clear season data from SQL to avoid duplicates on re-run
+        sql_adapter.clear_season(season)
 
         # Set up data directories
         data_dir = Path(settings.data_dir)
@@ -451,7 +494,7 @@ def setup(
         )
 
         # --- 3. Index Race Data (penalties from FastF1) ---
-        counts["race_data"] = _ingest_race_data(cache_dir, vector_store, limit, season)
+        counts["race_data"] = _ingest_race_data(cache_dir, vector_store, sql_adapter, limit, season)
 
         total = sum(counts.values())
         console.print(f"\n[green bold]Setup complete! Indexed {total} documents.[/]")

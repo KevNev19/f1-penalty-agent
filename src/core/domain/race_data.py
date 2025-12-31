@@ -28,6 +28,7 @@ class PenaltyEvent:
     session: str  # "Race", "Qualifying", "Sprint", etc.
     race_name: str
     season: int
+    team: str | None = None
     details: str | None = None
 
 

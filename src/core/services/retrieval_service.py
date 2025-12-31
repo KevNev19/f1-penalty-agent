@@ -337,9 +337,27 @@ Message: {event.message}
         race_filter = None
 
         if query_context:
-            # For race_data, filter by season if available (integer comparison)
+            # Build filters for race_data and stewards
+            # Note: We use "should" (OR) logic for flexibility? No, typically AND for specific query.
+            # But QdrantAdapter uses strict AND if we pass valid dict.
+
+            # Filter by Season
             if query_context.get("season"):
-                race_filter = {"season": {"$eq": query_context["season"]}}
+                race_filter = {"season": query_context["season"]}
+            else:
+                race_filter = {}
+
+            # Filter by Race
+            if query_context.get("race"):
+                race_filter["race"] = query_context["race"]
+
+            # Filter by Driver
+            if query_context.get("driver"):
+                race_filter["driver"] = query_context["driver"]
+
+            # Filter by Team
+            if query_context.get("team"):
+                race_filter["team"] = query_context["team"]
 
         # Determine how many candidates to retrieve
         # If using reranker, get more candidates for re-ranking
@@ -349,12 +367,26 @@ Message: {event.message}
             regulations = self._retrieve_regulations(query, expanded_query, top_k, retrieve_k)
 
         if include_stewards:
-            # Stewards don't use reliable metadata filters yet
-            stewards = self._retrieve_stewards(query, expanded_query, top_k, retrieve_k, None)
+            # Stewards don't usually have metadata for driver/race reliably parsed from PDF text chunks
+            # BUT if we have 'event' metadata (race name), we can filter.
+            # Stewards doc metadata keys: 'event', 'season', 'doc_type'.
+            # 'driver' is typically NOT in metadata (chunks are just text).
+            # So we only filter by Race/Season for stewards.
+            stewards_filter = {}
+            if query_context and query_context.get("season"):
+                stewards_filter["season"] = query_context["season"]
+            if query_context and query_context.get("race"):
+                stewards_filter["event"] = query_context["race"]  # metadata key is 'event'
+
+            stewards = self._retrieve_stewards(
+                query, expanded_query, top_k, retrieve_k, stewards_filter or None
+            )
 
         if include_race_data:
+            # Race data has 'race', 'season', 'driver', 'team' (added recently).
+            # We use the constructed race_filter.
             race_data = self._retrieve_race_data(
-                query, expanded_query, top_k, retrieve_k, race_filter
+                query, expanded_query, top_k, retrieve_k, race_filter or None
             )
 
         return RetrievalContext(
@@ -377,7 +409,29 @@ Message: {event.message}
             "driver": None,
             "race": None,
             "season": None,
+            "team": None,
         }
+
+        # Team names
+        team_patterns = [
+            (r"\bRed Bull\b", "Red Bull"),
+            (r"\bMercedes\b", "Mercedes"),
+            (r"\bFerrari\b", "Ferrari"),
+            (r"\bMcLaren\b", "McLaren"),
+            (r"\bAston Martin\b", "Aston Martin"),
+            (r"\bAlpine\b", "Alpine"),
+            (r"\bWilliams\b", "Williams"),
+            (r"\bRB\b", "RB"),  # Might be ambiguous?
+            (r"\bVisa Cash App\b", "RB"),
+            (r"\bSauber\b", "Sauber"),
+            (r"\bKick Sauber\b", "Sauber"),
+            (r"\bHaas\b", "Haas"),
+        ]
+
+        for pattern, team_name in team_patterns:
+            if re.search(pattern, query, re.I):
+                context["team"] = team_name
+                break
 
         # Common driver names/codes
         driver_patterns = [
@@ -394,6 +448,12 @@ Message: {event.message}
             (r"\bVER\b", "Max Verstappen"),
             (r"\bHAM\b", "Lewis Hamilton"),
             (r"\bNOR\b", "Lando Norris"),
+            # Add more if needed (Lawson, Bearman, etc for 2025)
+            (r"\bLawson\b", "Liam Lawson"),
+            (r"\bColapinto\b", "Franco Colapinto"),
+            (r"\bAntonelli\b", "Andrea Kimi Antonelli"),
+            (r"\bBearman\b", "Oliver Bearman"),
+            (r"\bDoohan\b", "Jack Doohan"),
         ]
 
         for pattern, driver_name in driver_patterns:
@@ -401,40 +461,61 @@ Message: {event.message}
                 context["driver"] = driver_name
                 break
 
-        # Race names
+        # Race names - Map keywords to Canonical "X Grand Prix"
         race_patterns = [
-            "Bahrain",
-            "Saudi Arabian",
-            "Australian",
-            "Japanese",
-            "Chinese",
-            "Miami",
-            "Monaco",
-            "Spanish",
-            "Canadian",
-            "Austrian",
-            "British",
-            "Hungarian",
-            "Belgian",
-            "Dutch",
-            "Italian",
-            "Azerbaijan",
-            "Singapore",
-            "United States",
-            "Mexican",
-            "Brazilian",
-            "Las Vegas",
-            "Qatar",
-            "Abu Dhabi",
-            "Silverstone",
-            "Monza",
-            "Spa",
-            "Imola",
+            ("Bahrain", "Bahrain Grand Prix"),
+            ("Saudi", "Saudi Arabian Grand Prix"),
+            ("Jeddah", "Saudi Arabian Grand Prix"),
+            ("Australia", "Australian Grand Prix"),
+            ("Melbourne", "Australian Grand Prix"),
+            ("Japan", "Japanese Grand Prix"),
+            ("Suzuka", "Japanese Grand Prix"),
+            ("China", "Chinese Grand Prix"),
+            ("Shanghai", "Chinese Grand Prix"),
+            ("Miami", "Miami Grand Prix"),
+            ("Emilia", "Emilia Romagna Grand Prix"),
+            ("Imola", "Emilia Romagna Grand Prix"),
+            ("Monaco", "Monaco Grand Prix"),
+            ("Canada", "Canadian Grand Prix"),
+            ("Montreal", "Canadian Grand Prix"),
+            ("Spain", "Spanish Grand Prix"),
+            ("Barcelona", "Spanish Grand Prix"),
+            ("Austria", "Austrian Grand Prix"),
+            ("Red Bull Ring", "Austrian Grand Prix"),
+            ("Britain", "British Grand Prix"),
+            ("Silverstone", "British Grand Prix"),
+            ("Hungary", "Hungarian Grand Prix"),
+            ("Budapest", "Hungarian Grand Prix"),
+            ("Belgium", "Belgian Grand Prix"),
+            ("Spa", "Belgian Grand Prix"),
+            ("Netherlands", "Dutch Grand Prix"),
+            ("Dutch", "Dutch Grand Prix"),
+            ("Zandvoort", "Dutch Grand Prix"),
+            ("Italy", "Italian Grand Prix"),
+            ("Monza", "Italian Grand Prix"),
+            ("Azerbaijan", "Azerbaijan Grand Prix"),
+            ("Baku", "Azerbaijan Grand Prix"),
+            ("Singapore", "Singapore Grand Prix"),
+            ("Marina Bay", "Singapore Grand Prix"),
+            ("Austin", "United States Grand Prix"),
+            (
+                "United States",
+                "United States Grand Prix",
+            ),  # "United States Grand Prix" contains "United States"
+            ("USA", "United States Grand Prix"),
+            ("Mexico", "Mexico City Grand Prix"),
+            ("Brazil", "São Paulo Grand Prix"),
+            ("Sao Paulo", "São Paulo Grand Prix"),
+            ("Interlagos", "São Paulo Grand Prix"),
+            ("Las Vegas", "Las Vegas Grand Prix"),
+            ("Qatar", "Qatar Grand Prix"),
+            ("Lusail", "Qatar Grand Prix"),
+            ("Abu Dhabi", "Abu Dhabi Grand Prix"),
         ]
 
-        for race in race_patterns:
-            if re.search(rf"\b{race}\b", query, re.I):
-                context["race"] = race
+        for keyword, canonical in race_patterns:
+            if re.search(rf"\b{keyword}\b", query, re.I):
+                context["race"] = canonical
                 break
 
         # Season/year - support years from 2000 onwards
@@ -444,5 +525,8 @@ Message: {event.message}
             # Validate reasonable F1 season range (F1 started in 1950, but modern era starts ~2000)
             if 2000 <= year <= 2099:
                 context["season"] = year
+
+        # Default to 2025 if no season specified?
+        # No, strict filtering is safer. If None, it searches all. Can boost recent in reranker.
 
         return context

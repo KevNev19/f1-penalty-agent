@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import { ChatInterface } from './components/ChatInterface';
 import { AdminPage } from './pages/AdminPage';
@@ -9,59 +9,70 @@ const AdminPageWrapper = () => {
   return <AdminPage onBack={() => navigate('/')} />;
 };
 
-// Home component to isolate verify home view
+// Home component - compact header + full-height chat
 const Home = () => (
-  <>
-    <div className="text-center mb-8 animate-fade-in-down px-4">
-      <h1 className="text-3xl md:text-5xl font-black italic mb-2 tracking-tighter">
-        <span className="text-f1-red">FIA</span> REGULATION <span className="text-white">ASSISTANT</span>
-      </h1>
-      <p className="text-f1-silver text-sm md:text-lg font-medium max-w-2xl mx-auto">
-        Real-time analysis of penalties, regulations, and stewards' decisions.
-      </p>
-      <div className="mt-4 flex justify-center">
-        <span className="text-f1-red font-bold uppercase tracking-[0.2em] text-xs md:text-sm">Official Regulation Assistant</span>
+  <div className="flex flex-col h-full overflow-hidden">
+    {/* Hero Header - Icon + Styled Text Logo */}
+    <div className="text-center py-4 px-4 flex-shrink-0">
+      <div className="flex items-center justify-center">
+        {/* Logo matching logo-pw.png: icon on left overlapping the P */}
+        <div className="relative flex items-center">
+          {/* Glow effect */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 blur-2xl opacity-40 bg-f1-red w-28 h-28 md:w-40 md:h-40 rounded-full" />
+
+          {/* Icon on left - BIGGER, overlapping into the text */}
+          <img
+            src="/favicon.png"
+            alt="PitWallAI Icon"
+            className="relative z-20 h-20 md:h-28 lg:h-36 w-auto drop-shadow-[0_0_20px_rgba(255,10,10,0.5)] -mr-6 md:-mr-10 lg:-mr-12"
+          />
+
+          {/* PitWall as one word - shifted down and left to hug the earpiece */}
+          <span className="text-2xl md:text-4xl lg:text-5xl font-black italic tracking-tight text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] translate-y-3 -ml-5 md:-ml-7">
+            PitWall
+          </span>
+
+          {/* AI in red */}
+          <span className="text-2xl md:text-4xl lg:text-5xl font-black italic tracking-tight text-f1-red drop-shadow-[0_0_15px_rgba(255,10,10,0.5)] translate-y-3">
+            AI
+          </span>
+        </div>
       </div>
+      <p className="text-white/60 text-xs md:text-sm font-semibold tracking-[0.3em] uppercase mt-1">
+        Official AI Strategic Assistant
+      </p>
     </div>
 
-    <ChatInterface />
-
-    <div className="fixed bottom-4 right-4 z-50 hidden md:block">
-      <Link
-        to="/admin"
-        className="bg-black/80 border border-f1-grey/30 hover:border-f1-red hover:bg-f1-red/10 text-f1-silver text-[10px] font-mono p-2 rounded uppercase tracking-widest backdrop-blur transition-all inline-block"
-      >
-        System Status
-      </Link>
+    {/* Chat takes remaining space */}
+    <div className="flex-1 min-h-0 px-2 md:px-4 pb-2">
+      <ChatInterface />
     </div>
-  </>
+  </div>
 );
 
+
 function AppContent() {
-  const location = useLocation();
-  const isChatView = location.pathname === '/';
 
   return (
-    <div className="min-h-screen bg-f1-black text-white bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-f1-grey/20 via-f1-black to-f1-black">
+    <div className="min-h-screen text-white relative">
+      {/* F1 Track Background */}
+      <div
+        className="fixed inset-0 -z-30 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/bg-track.png)' }}
+      />
+      {/* Dark overlay for readability */}
+      <div className="fixed inset-0 -z-20 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
+
       <Navbar />
 
-      <main className="container mx-auto px-4 pt-24 pb-12">
+      <main className="pt-16 h-screen overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<AdminPageWrapper />} />
         </Routes>
       </main>
 
-      {isChatView && (
-        <footer className="fixed bottom-0 w-full text-center py-4 text-f1-silver/40 text-[10px] pointer-events-none">
-          Not officially affiliated with Formula 1 or the FIA. Data for educational purposes only.
-        </footer>
-      )}
 
-      {/* Dynamic Background Grid */}
-      <div className="fixed inset-0 pointer-events-none -z-20 opacity-20"
-        style={{ backgroundImage: 'linear-gradient(#38383f 1px, transparent 1px), linear-gradient(90deg, #38383f 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
-      </div>
     </div>
   );
 }

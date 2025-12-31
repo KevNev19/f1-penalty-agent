@@ -20,31 +20,54 @@
     @apply bg-f1-dark text-white font-f1 antialiased;
     background-image: radial-gradient(circle at top right, #1a1a2e, #15151e);
   }
+
+  /* Mobile-first: Larger, more readable text for small screens */
+  @media (max-width: 768px) {
+    html {
+      font-size: 18px;
+      /* Bump base font for better mobile readability */
+    }
+
+    /* Ensure chat messages are easily readable */
+    .prose {
+      font-size: 1.1rem;
+      line-height: 1.7;
+    }
+
+    /* Larger touch targets for mobile */
+    button,
+    input,
+    textarea {
+      min-height: 48px;
+      font-size: 1rem;
+    }
+
+    /* Better spacing for mobile chat bubbles */
+    .chat-message {
+      padding: 1rem 1.25rem;
+    }
+  }
 }
 
 @layer utilities {
   .f1-slant {
     clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
   }
-  
+
   .f1-clip-message {
-    clip-path: polygon(
-      0 0,
-      100% 0,
-      100% calc(100% - 12px),
-      calc(100% - 12px) 100%,
-      0 100%
-    );
+    clip-path: polygon(0 0,
+        100% 0,
+        100% calc(100% - 12px),
+        calc(100% - 12px) 100%,
+        0 100%);
   }
 
   .f1-clip-message-user {
-    clip-path: polygon(
-      12px 0,
-      100% 0,
-      100% 100%,
-      0 100%,
-      0 12px
-    );
+    clip-path: polygon(12px 0,
+        100% 0,
+        100% 100%,
+        0 100%,
+        0 12px);
   }
 
   .f1-border-bottom {
