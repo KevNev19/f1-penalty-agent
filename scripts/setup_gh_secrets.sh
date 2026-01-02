@@ -112,13 +112,13 @@ read -p "Do you want to upload these secrets to GitHub now? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Setting GitHub Secrets using gh CLI..."
-    
+
     gh secret set GCP_PROJECT_ID --body "$PROJECT_ID"
     echo "Set GCP_PROJECT_ID"
 
     gh secret set GCP_SERVICE_ACCOUNT --body "$SERVICE_ACCOUNT_EMAIL"
     echo "Set GCP_SERVICE_ACCOUNT"
-    
+
     gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --body "$WORKLOAD_IDENTITY_PROVIDER"
     echo "Set GCP_WORKLOAD_IDENTITY_PROVIDER"
 

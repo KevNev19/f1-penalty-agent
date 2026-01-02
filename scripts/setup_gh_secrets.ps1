@@ -5,7 +5,7 @@
 .DESCRIPTION
     This script automates the creation of a GCP Service Account, Workload Identity Pool,
     and Provider, and then sets the necessary GitHub Secrets using the 'gh' CLI.
-    
+
     Prerequisites:
     - gcloud CLI installed and authenticated
     - gh CLI installed and authenticated
@@ -134,7 +134,7 @@ $ErrorActionPreference = "Stop"
 
 # --- 8. Allow GitHub Repo to Impersonate SA ---
 Write-Color "Binding Service Account to GitHub Repo..."
-# Note: Check if binding exists to avoid error? gcloud usually handles idempotency gracefully for bindings 
+# Note: Check if binding exists to avoid error? gcloud usually handles idempotency gracefully for bindings
 # but for service account IAM policy binding, we need to be careful.
 # This command adds the binding.
 gcloud iam service-accounts add-iam-policy-binding $SERVICE_ACCOUNT_EMAIL `
@@ -156,13 +156,13 @@ Write-Color "------------------------------------------------"
 $setSecrets = Read-Host "Do you want to upload these secrets to GitHub now? (y/n)"
 if ($setSecrets -eq "y") {
     Write-Color "Setting GitHub Secrets using gh CLI..."
-    
+
     gh secret set GCP_PROJECT_ID --body "$PROJECT_ID"
     Write-Host "Set GCP_PROJECT_ID"
 
     gh secret set GCP_SERVICE_ACCOUNT --body "$SERVICE_ACCOUNT_EMAIL"
     Write-Host "Set GCP_SERVICE_ACCOUNT"
-    
+
     gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --body "$WORKLOAD_IDENTITY_PROVIDER"
     Write-Host "Set GCP_WORKLOAD_IDENTITY_PROVIDER"
 

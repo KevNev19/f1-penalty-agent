@@ -48,17 +48,17 @@ class SQLiteAdapter:
 
                 # Create index for faster searching
                 cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_penalties_season_race 
+                    CREATE INDEX IF NOT EXISTS idx_penalties_season_race
                     ON penalties(season, race_name)
                 """)
 
                 cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_penalties_driver 
+                    CREATE INDEX IF NOT EXISTS idx_penalties_driver
                     ON penalties(driver)
                 """)
 
                 cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_penalties_team 
+                    CREATE INDEX IF NOT EXISTS idx_penalties_team
                     ON penalties(team)
                 """)
 

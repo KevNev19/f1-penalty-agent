@@ -73,7 +73,7 @@ src/
 
 During a live F1 session, fans can ask about **current incidents** and get contextual explanations combining:
 - Live race control messages (what's happening NOW)
-- FIA regulations (why it's a violation)  
+- FIA regulations (why it's a violation)
 - Historical precedent (typical penalty outcomes)
 
 ### Architecture Addition
@@ -109,7 +109,7 @@ from datetime import datetime
 @dataclass
 class LiveSession:
     """A live F1 session."""
-    
+
     session_key: int
     session_name: str  # "Race", "Qualifying", "Sprint"
     location: str      # "Monaco", "Silverstone"
@@ -117,29 +117,29 @@ class LiveSession:
     circuit: str
     date_start: datetime | None
     year: int
-    
+
     @property
     def display_name(self) -> str:
         """Human-readable session name."""
         return f"{self.session_name} at {self.location}"
 
 
-@dataclass  
+@dataclass
 class LiveRaceControlMessage:
     """A race control message from live timing."""
-    
+
     date: datetime
     message: str
     category: str  # "Flag", "SafetyCar", "Other"
     driver_number: int | None = None
     lap_number: int | None = None
-    
+
     @property
     def is_investigation(self) -> bool:
         """Check if this message indicates an investigation."""
         keywords = ["NOTED", "UNDER INVESTIGATION", "INVESTIGATED", "SUMMON"]
         return any(kw in self.message.upper() for kw in keywords)
-    
+
     @property
     def is_penalty(self) -> bool:
         """Check if this message announces a penalty."""
@@ -149,12 +149,12 @@ class LiveRaceControlMessage:
             "DISQUALIFIED",
         ]
         return any(kw in self.message.upper() for kw in keywords)
-    
+
     @property
     def is_track_limits(self) -> bool:
         """Check if this is a track limits message."""
         return "TRACK LIMITS" in self.message.upper() or "LAP TIME DELETED" in self.message.upper()
-    
+
     @property
     def is_penalty_relevant(self) -> bool:
         """Check if relevant for penalty explanation."""
@@ -164,7 +164,7 @@ class LiveRaceControlMessage:
 @dataclass
 class LiveDriver:
     """Driver info from live session."""
-    
+
     driver_number: int
     full_name: str
     name_acronym: str  # "VER", "HAM"
@@ -173,12 +173,12 @@ class LiveDriver:
 
 class LiveDataSourcePort(ABC):
     """Abstract interface for live F1 timing data."""
-    
+
     @abstractmethod
     def get_current_session(self) -> LiveSession | None:
         """Get the current or most recent session."""
         ...
-    
+
     @abstractmethod
     def get_race_control_messages(
         self,
@@ -187,7 +187,7 @@ class LiveDataSourcePort(ABC):
     ) -> list[LiveRaceControlMessage]:
         """Get race control messages for a session."""
         ...
-    
+
     @abstractmethod
     def get_penalty_messages(
         self,
@@ -195,7 +195,7 @@ class LiveDataSourcePort(ABC):
     ) -> list[LiveRaceControlMessage]:
         """Get only penalty-relevant messages."""
         ...
-    
+
     @abstractmethod
     def get_drivers(
         self,
@@ -203,7 +203,7 @@ class LiveDataSourcePort(ABC):
     ) -> list[LiveDriver]:
         """Get drivers for a session."""
         ...
-    
+
     @abstractmethod
     def get_driver_name(
         self,
@@ -244,34 +244,34 @@ REQUEST_TIMEOUT = 10
 
 class OpenF1Adapter(LiveDataSourcePort):
     """Adapter for OpenF1 real-time F1 data API.
-    
+
     API Documentation: https://openf1.org
-    
+
     Usage:
         adapter = OpenF1Adapter()
         session = adapter.get_current_session()
         messages = adapter.get_penalty_messages(session.session_key)
     """
-    
+
     BASE_URL = "https://api.openf1.org/v1"
-    
+
     def __init__(self) -> None:
         """Initialize the adapter."""
         self._session = requests.Session()
         self._session.headers.update({"User-Agent": "PitWallAI/1.0"})
         self._driver_cache: dict[tuple[int, int], LiveDriver] = {}
-    
+
     def close(self) -> None:
         """Close the HTTP session."""
         if self._session:
             self._session.close()
-    
+
     def __enter__(self) -> "OpenF1Adapter":
         return self
-    
+
     def __exit__(self, *args) -> None:
         self.close()
-    
+
     def _get(self, endpoint: str, params: dict | None = None) -> list[dict] | None:
         """Make a GET request to the API."""
         url = f"{self.BASE_URL}{endpoint}"
@@ -282,7 +282,7 @@ class OpenF1Adapter(LiveDataSourcePort):
         except requests.RequestException as e:
             logger.warning(f"OpenF1 API error: {e}")
             return None
-    
+
     @staticmethod
     def _parse_datetime(value: str | None) -> datetime | None:
         """Parse ISO datetime string from API."""
@@ -292,17 +292,17 @@ class OpenF1Adapter(LiveDataSourcePort):
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except (ValueError, TypeError):
             return None
-    
+
     # =========================================================================
     # LiveDataSourcePort Implementation
     # =========================================================================
-    
+
     def get_current_session(self) -> LiveSession | None:
         """Get the current or most recent F1 session."""
         data = self._get("/sessions", params={"session_key": "latest"})
         if not data or len(data) == 0:
             return None
-        
+
         s = data[0]
         return LiveSession(
             session_key=s.get("session_key"),
@@ -313,7 +313,7 @@ class OpenF1Adapter(LiveDataSourcePort):
             date_start=self._parse_datetime(s.get("date_start")),
             year=s.get("year", 2025),
         )
-    
+
     def get_race_control_messages(
         self,
         session_key: int | str = "latest",
@@ -323,11 +323,11 @@ class OpenF1Adapter(LiveDataSourcePort):
         params: dict = {"session_key": session_key}
         if driver_number:
             params["driver_number"] = driver_number
-        
+
         data = self._get("/race_control", params=params)
         if not data:
             return []
-        
+
         messages = []
         for msg in data:
             messages.append(
@@ -339,11 +339,11 @@ class OpenF1Adapter(LiveDataSourcePort):
                     lap_number=msg.get("lap_number"),
                 )
             )
-        
+
         # Sort by date, newest first
         messages.sort(key=lambda m: m.date, reverse=True)
         return messages
-    
+
     def get_penalty_messages(
         self,
         session_key: int | str = "latest",
@@ -351,7 +351,7 @@ class OpenF1Adapter(LiveDataSourcePort):
         """Get only penalty-relevant messages."""
         all_messages = self.get_race_control_messages(session_key)
         return [m for m in all_messages if m.is_penalty_relevant]
-    
+
     def get_drivers(
         self,
         session_key: int | str = "latest",
@@ -360,16 +360,16 @@ class OpenF1Adapter(LiveDataSourcePort):
         data = self._get("/drivers", params={"session_key": session_key})
         if not data:
             return []
-        
+
         drivers = []
         seen_numbers = set()  # API sometimes returns duplicates
-        
+
         for d in data:
             num = d.get("driver_number")
             if num in seen_numbers:
                 continue
             seen_numbers.add(num)
-            
+
             driver = LiveDriver(
                 driver_number=num,
                 full_name=d.get("full_name", ""),
@@ -377,13 +377,13 @@ class OpenF1Adapter(LiveDataSourcePort):
                 team_name=d.get("team_name", ""),
             )
             drivers.append(driver)
-            
+
             # Cache for lookups
             if isinstance(session_key, int):
                 self._driver_cache[(session_key, num)] = driver
-        
+
         return drivers
-    
+
     def get_driver_name(
         self,
         driver_number: int,
@@ -393,13 +393,13 @@ class OpenF1Adapter(LiveDataSourcePort):
         cache_key = (session_key, driver_number)
         if cache_key in self._driver_cache:
             return self._driver_cache[cache_key].full_name
-        
+
         # Fetch and cache all drivers
         self.get_drivers(session_key)
-        
+
         if cache_key in self._driver_cache:
             return self._driver_cache[cache_key].full_name
-        
+
         return None
 ```
 
@@ -453,7 +453,7 @@ from src.core.ports.live_data_port import LiveRaceControlMessage
 
 class TestLiveRaceControlMessage:
     """Tests for message classification properties."""
-    
+
     @pytest.mark.unit
     def test_is_investigation(self):
         msg = LiveRaceControlMessage(
@@ -463,7 +463,7 @@ class TestLiveRaceControlMessage:
         )
         assert msg.is_investigation is True
         assert msg.is_penalty is False
-    
+
     @pytest.mark.unit
     def test_is_penalty(self):
         msg = LiveRaceControlMessage(
@@ -472,7 +472,7 @@ class TestLiveRaceControlMessage:
             category="Other",
         )
         assert msg.is_penalty is True
-    
+
     @pytest.mark.unit
     def test_is_track_limits(self):
         msg = LiveRaceControlMessage(
@@ -481,7 +481,7 @@ class TestLiveRaceControlMessage:
             category="Other",
         )
         assert msg.is_track_limits is True
-    
+
     @pytest.mark.unit
     def test_is_penalty_relevant(self):
         relevant = LiveRaceControlMessage(
@@ -490,7 +490,7 @@ class TestLiveRaceControlMessage:
             category="Other",
         )
         assert relevant.is_penalty_relevant is True
-        
+
         not_relevant = LiveRaceControlMessage(
             date=datetime.now(),
             message="DRS ENABLED",
@@ -501,16 +501,16 @@ class TestLiveRaceControlMessage:
 
 class TestOpenF1Adapter:
     """Tests for OpenF1Adapter with mocked HTTP."""
-    
+
     @pytest.fixture
     def mock_session(self):
         with patch("requests.Session") as mock:
             yield mock.return_value
-    
+
     @pytest.mark.unit
     def test_get_current_session(self, mock_session):
         from src.adapters.outbound.data_sources.openf1_adapter import OpenF1Adapter
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [{
@@ -522,20 +522,20 @@ class TestOpenF1Adapter:
             "year": 2025,
         }]
         mock_session.get.return_value = mock_response
-        
+
         adapter = OpenF1Adapter()
         adapter._session = mock_session
-        
+
         session = adapter.get_current_session()
-        
+
         assert session is not None
         assert session.session_name == "Race"
         assert session.location == "Monaco"
-    
+
     @pytest.mark.unit
     def test_get_penalty_messages_filters_correctly(self, mock_session):
         from src.adapters.outbound.data_sources.openf1_adapter import OpenF1Adapter
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
@@ -544,12 +544,12 @@ class TestOpenF1Adapter:
             {"date": "2025-05-25T14:32:00Z", "message": "GREEN FLAG", "category": "Flag"},
         ]
         mock_session.get.return_value = mock_response
-        
+
         adapter = OpenF1Adapter()
         adapter._session = mock_session
-        
+
         messages = adapter.get_penalty_messages("latest")
-        
+
         assert len(messages) == 1
         assert "INVESTIGATION" in messages[0].message
 ```
@@ -574,7 +574,7 @@ if TYPE_CHECKING:
 
 class QueryType(Enum):
     """Type of user query for the F1 agent."""
-    
+
     PENALTY_EXPLANATION = "penalty_explanation"
     RULE_LOOKUP = "rule_lookup"
     ANALYTICS = "analytics"
@@ -584,7 +584,7 @@ class QueryType(Enum):
 @dataclass
 class ChatMessage:
     """A single message in the chat history."""
-    
+
     role: str
     content: str
 
@@ -592,34 +592,34 @@ class ChatMessage:
 @dataclass
 class RetrievalContext:
     """Context retrieved for answering a question.
-    
+
     Holds search results from different collections plus live data
     that will be used to build the LLM prompt context.
     """
-    
+
     regulations: list["SearchResult"]
     stewards_decisions: list["SearchResult"]
     race_data: list["SearchResult"]
     query: str
-    
+
     # Live data from OpenF1 (empty if no active session)
     live_messages: list["LiveRaceControlMessage"] = field(default_factory=list)
     live_session: "LiveSession | None" = None
-    
+
     @staticmethod
     def _sanitize_text(text: str) -> str:
         """Normalize text for safe use in prompts."""
         from .utils import normalize_text
         return normalize_text(text)
-    
+
     @property
     def has_live_data(self) -> bool:
         """Check if live data is present."""
         return len(self.live_messages) > 0
-    
+
     def get_combined_context(self, max_chars: int = 8000) -> str:
         """Get combined context string for the LLM.
-        
+
         Priority order:
         1. Live race control (what's happening NOW)
         2. FIA regulations (the rules)
@@ -627,10 +627,10 @@ class RetrievalContext:
         4. Historical race data
         """
         from .utils import normalize_text
-        
+
         parts = []
         char_count = 0
-        
+
         # =====================================================================
         # LIVE CONTEXT FIRST (most immediately relevant)
         # =====================================================================
@@ -638,27 +638,27 @@ class RetrievalContext:
             session_info = ""
             if self.live_session:
                 session_info = f" - {self.live_session.display_name}"
-            
+
             parts.append(f"=== LIVE RACE CONTROL{session_info} ===")
             parts.append("(Real-time messages from the current session)\n")
-            
+
             # Reserve ~25% of budget for live data
             live_budget = int(max_chars * 0.25)
-            
+
             for msg in self.live_messages[:10]:
                 if char_count > live_budget:
                     break
-                
+
                 timestamp = msg.date.strftime("%H:%M:%S") if msg.date else ""
                 lap_info = f"[Lap {msg.lap_number}] " if msg.lap_number else ""
                 driver_info = f"(Car {msg.driver_number}) " if msg.driver_number else ""
-                
+
                 line = f"[{timestamp}] {lap_info}{driver_info}{msg.message}"
                 parts.append(line)
                 char_count += len(line)
-            
+
             parts.append("")  # Blank separator
-        
+
         # =====================================================================
         # REGULATIONS (authoritative rules)
         # =====================================================================
@@ -671,7 +671,7 @@ class RetrievalContext:
                 source = normalize_text(result.document.metadata.get("source", "Unknown") or "")
                 parts.append(f"\n[Source: {source}]\n{content}")
                 char_count += len(content)
-        
+
         # =====================================================================
         # STEWARDS DECISIONS (precedent)
         # =====================================================================
@@ -684,7 +684,7 @@ class RetrievalContext:
                 event = normalize_text(result.document.metadata.get("event", "Unknown") or "")
                 parts.append(f"\n[Event: {event}]\n{content}")
                 char_count += len(content)
-        
+
         # =====================================================================
         # HISTORICAL RACE DATA
         # =====================================================================
@@ -696,17 +696,17 @@ class RetrievalContext:
                 content = normalize_text(result.document.content or "")
                 parts.append(f"\n{content}")
                 char_count += len(content)
-        
+
         if not parts:
             return "No specific context found. Provide a general response based on F1 knowledge."
-        
+
         return "\n".join(parts)
 
 
 @dataclass
 class AgentResponse:
     """Response from the F1 agent."""
-    
+
     answer: str
     query_type: QueryType
     sources_used: list[str]
@@ -734,7 +734,7 @@ def __init__(
     live_data_source: "LiveDataSourcePort | None" = None,  # NEW
 ) -> None:
     """Initialize the retriever.
-    
+
     Args:
         vector_store: QdrantVectorStore instance for document retrieval.
         use_reranker: Whether to use cross-encoder re-ranking.
@@ -743,7 +743,7 @@ def __init__(
     self.vector_store = vector_store
     self.reranker = CrossEncoderReranker() if use_reranker else None
     self._live_source = live_data_source
-    
+
     if self.reranker:
         logger.info("Cross-encoder re-ranking enabled")
 ```
@@ -768,11 +768,11 @@ def _fetch_live_context(
     query_context: dict | None,
 ) -> tuple[list["LiveRaceControlMessage"], "LiveSession | None"]:
     """Fetch relevant live race control messages.
-    
+
     Args:
         query: User's question
         query_context: Detected driver/race context
-        
+
     Returns:
         Tuple of (messages, session)
     """
@@ -781,15 +781,15 @@ def _fetch_live_context(
         if not session:
             logger.debug("No active session for live data")
             return [], None
-        
+
         logger.debug(f"Fetching live data from: {session.display_name}")
-        
+
         messages = self.live_source.get_penalty_messages(session.session_key)
-        
+
         if not messages:
             logger.debug("No penalty-relevant messages in current session")
             return [], session
-        
+
         # Prioritize messages for queried driver if specified
         if query_context and query_context.get("driver"):
             messages = self._prioritize_driver_messages(
@@ -797,10 +797,10 @@ def _fetch_live_context(
                 query_context["driver"],
                 session.session_key,
             )
-        
+
         logger.info(f"Found {len(messages)} live penalty messages")
         return messages[:15], session
-        
+
     except Exception as e:
         logger.warning(f"Failed to fetch live context: {e}")
         return [], None
@@ -813,23 +813,23 @@ def _prioritize_driver_messages(
 ) -> list["LiveRaceControlMessage"]:
     """Reorder messages to prioritize those for the queried driver."""
     driver_query_lower = driver_query.lower()
-    
+
     def matches_driver(msg: "LiveRaceControlMessage") -> bool:
         if not msg.driver_number:
             return False
-        
+
         if driver_query_lower in msg.message.lower():
             return True
-        
+
         driver_name = self.live_source.get_driver_name(msg.driver_number, session_key)
         if driver_name and driver_query_lower in driver_name.lower():
             return True
-        
+
         return False
-    
+
     driver_msgs = [m for m in messages if matches_driver(m)]
     other_msgs = [m for m in messages if not matches_driver(m)]
-    
+
     return driver_msgs + other_msgs
 ```
 
@@ -846,7 +846,7 @@ def retrieve(
     query_context: dict | None = None,
 ) -> RetrievalContext:
     """Retrieve relevant context for a query.
-    
+
     Args:
         query: User's question.
         top_k: Number of results per category.
@@ -855,7 +855,7 @@ def retrieve(
         include_race_data: Whether to search race control data.
         include_live: Whether to fetch live OpenF1 data.
         query_context: Optional dict with detected driver/race/season.
-        
+
     Returns:
         RetrievalContext with documents and live data.
     """
@@ -864,15 +864,15 @@ def retrieve(
     race_data = []
     live_messages = []
     live_session = None
-    
+
     expanded_query = self.expand_query(query)
-    
+
     # === FETCH LIVE DATA FIRST (fast API call) ===
     if include_live:
         live_messages, live_session = self._fetch_live_context(query, query_context)
-    
+
     # ... existing vector search code ...
-    
+
     return RetrievalContext(
         regulations=regulations,
         stewards_decisions=stewards,
@@ -896,18 +896,18 @@ def ask(
     include_live: bool = True,  # NEW
 ) -> AgentResponse:
     """Ask a question and get a response.
-    
+
     Args:
         query: User's question about F1 penalties/rules.
         messages: Optional chat history for context.
         stream: Whether to stream the response.
         include_live: Whether to include live session data.
-        
+
     Returns:
         AgentResponse with the answer and metadata.
     """
     # ... existing code ...
-    
+
     # Retrieve documents + live data
     logger.debug("Searching knowledge base...")
     context = self.retriever.retrieve(
@@ -916,14 +916,14 @@ def ask(
         query_context=query_context,
         include_live=include_live,  # Pass through
     )
-    
+
     if context.has_live_data:
         logger.info(f"Live data included from: {context.live_session.display_name}")
-    
+
     # ... rest of existing code ...
-    
+
     sources = self.get_sources(context)
-    
+
     # Add live session as first source if present
     if context.live_session:
         sources.insert(0, {
@@ -931,7 +931,7 @@ def ask(
             "doc_type": "live",
             "score": 1.0,
         })
-    
+
     return AgentResponse(
         answer=answer,
         query_type=query_type,
@@ -978,7 +978,7 @@ def get_retriever() -> F1Retriever:
 ```python
 class QuestionRequest(BaseModel):
     """Request model for asking a question."""
-    
+
     question: str = Field(
         ...,
         min_length=1,
@@ -997,7 +997,7 @@ class QuestionRequest(BaseModel):
 
 class AnswerResponse(BaseModel):
     """Response model for an answered question."""
-    
+
     answer: str = Field(..., description="The AI-generated answer")
     sources: list[SourceInfo] = Field(default_factory=list)
     question: str = Field(..., description="The original question asked")
@@ -1019,24 +1019,24 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
     try:
         agent = get_agent()
         normalized_question = normalize_text(request.question)
-        
+
         # ... existing validation ...
-        
+
         history = [DomainChatMessage(role=m.role, content=m.content) for m in request.messages]
-        
+
         response = agent.ask(
             normalized_question,
             messages=history,
             include_live=request.include_live,  # Pass through
         )
-        
+
         # ... build sources ...
-        
+
         # Get live session name if present
         live_session_name = None
         if response.context and response.context.live_session:
             live_session_name = response.context.live_session.display_name
-        
+
         return AnswerResponse(
             answer=response.answer,
             sources=sources,
@@ -1044,7 +1044,7 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
             model_used="gemini-2.0-flash",
             live_session=live_session_name,  # NEW
         )
-    
+
     except Exception as e:
         # ... error handling ...
 ```
@@ -1173,7 +1173,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SyncResult:
     """Result of a sync operation."""
-    
+
     regulations_added: int = 0
     regulations_updated: int = 0
     stewards_added: int = 0
@@ -1181,11 +1181,11 @@ class SyncResult:
     race_data_added: int = 0
     orphans_removed: int = 0
     errors: list[str] = None
-    
+
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
-    
+
     @property
     def total_changes(self) -> int:
         return (
@@ -1193,7 +1193,7 @@ class SyncResult:
             self.stewards_added + self.stewards_updated +
             self.race_data_added + self.orphans_removed
         )
-    
+
     def to_dict(self) -> dict:
         return {
             "regulations": {"added": self.regulations_added, "updated": self.regulations_updated},
@@ -1208,7 +1208,7 @@ class SyncResult:
 @dataclass
 class SyncOptions:
     """Options for sync operation."""
-    
+
     season: int = 2025
     include_regulations: bool = True
     include_stewards: bool = True
@@ -1223,7 +1223,7 @@ class SyncOptions:
 
 class DataSyncService:
     """Orchestrates data synchronization for the knowledge base.
-    
+
     Usage:
         sync_service = DataSyncService(
             vector_store=qdrant,
@@ -1231,17 +1231,17 @@ class DataSyncService:
             race_loader=fastf1_adapter,
             data_dir=Path("./data"),
         )
-        
+
         # Full sync
         result = sync_service.sync(SyncOptions(season=2025, force_full_sync=True))
-        
+
         # Incremental sync (new docs only)
         result = sync_service.sync(SyncOptions(
             season=2025,
             since_date=datetime.now() - timedelta(days=7),
         ))
     """
-    
+
     def __init__(
         self,
         vector_store: VectorStorePort,
@@ -1255,22 +1255,22 @@ class DataSyncService:
         self.race_loader = race_loader
         self.sql_adapter = sql_adapter
         self.data_dir = data_dir
-        
+
         # Track what's been indexed (for incremental)
         self._indexed_doc_hashes: set[str] = set()
-    
+
     def sync(self, options: SyncOptions) -> SyncResult:
         """Run a sync operation with the given options.
-        
+
         Args:
             options: Configuration for the sync.
-            
+
         Returns:
             SyncResult with counts of changes made.
         """
         result = SyncResult()
         logger.info(f"Starting sync for season {options.season}")
-        
+
         if options.include_regulations:
             try:
                 reg_result = self._sync_regulations(options)
@@ -1279,7 +1279,7 @@ class DataSyncService:
             except Exception as e:
                 logger.error(f"Regulations sync failed: {e}")
                 result.errors.append(f"Regulations: {e}")
-        
+
         if options.include_stewards:
             try:
                 stewards_result = self._sync_stewards(options)
@@ -1288,7 +1288,7 @@ class DataSyncService:
             except Exception as e:
                 logger.error(f"Stewards sync failed: {e}")
                 result.errors.append(f"Stewards: {e}")
-        
+
         if options.include_race_data:
             try:
                 race_result = self._sync_race_data(options)
@@ -1296,46 +1296,46 @@ class DataSyncService:
             except Exception as e:
                 logger.error(f"Race data sync failed: {e}")
                 result.errors.append(f"Race data: {e}")
-        
+
         if options.cleanup_orphans:
             try:
                 result.orphans_removed = self._cleanup_orphans(options)
             except Exception as e:
                 logger.error(f"Cleanup failed: {e}")
                 result.errors.append(f"Cleanup: {e}")
-        
+
         logger.info(f"Sync complete: {result.total_changes} changes")
         return result
-    
+
     def _sync_regulations(self, options: SyncOptions) -> dict:
         """Sync FIA regulations."""
         logger.info(f"Syncing regulations for {options.season}...")
-        
+
         # Scrape available regulations
         regulations = self.fia_scraper.scrape_regulations(options.season)
-        
+
         added = 0
         updated = 0
-        
+
         for reg in regulations:
             # Download and extract
             self.fia_scraper.download_document(reg)
             self.fia_scraper.extract_text(reg)
-            
+
             if not reg.text_content:
                 continue
-            
+
             # Check if already indexed (by URL hash)
             doc_hash = f"reg_{hash(reg.url) % 10000}"
-            
+
             # For incremental, skip if already indexed and not forcing
             if not options.force_full_sync and doc_hash in self._indexed_doc_hashes:
                 continue
-            
+
             # Chunk and index
             clean_text = normalize_text(reg.text_content)
             chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-            
+
             docs = []
             for i, chunk in enumerate(chunks):
                 docs.append(Document(
@@ -1350,43 +1350,43 @@ class DataSyncService:
                         "indexed_at": datetime.now().isoformat(),
                     },
                 ))
-            
+
             if docs:
                 self.vector_store.add_documents(docs, "regulations")
                 self._indexed_doc_hashes.add(doc_hash)
-                
+
                 if doc_hash in self._indexed_doc_hashes:
                     updated += 1
                 else:
                     added += 1
-        
+
         logger.info(f"Regulations: {added} added, {updated} updated")
         return {"added": added, "updated": updated}
-    
+
     def _sync_stewards(self, options: SyncOptions) -> dict:
         """Sync stewards decisions."""
         logger.info(f"Syncing stewards decisions for {options.season}...")
-        
+
         decisions = self.fia_scraper.scrape_stewards_decisions(options.season)
-        
+
         added = 0
         updated = 0
-        
+
         for dec in decisions:
             self.fia_scraper.download_document(dec)
             self.fia_scraper.extract_text(dec)
-            
+
             if not dec.text_content:
                 continue
-            
+
             doc_hash = f"dec_{hash(dec.url) % 10000}"
-            
+
             if not options.force_full_sync and doc_hash in self._indexed_doc_hashes:
                 continue
-            
+
             clean_text = normalize_text(dec.text_content)
             chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-            
+
             docs = []
             for i, chunk in enumerate(chunks):
                 docs.append(Document(
@@ -1402,41 +1402,41 @@ class DataSyncService:
                         "indexed_at": datetime.now().isoformat(),
                     },
                 ))
-            
+
             if docs:
                 self.vector_store.add_documents(docs, "stewards_decisions")
                 self._indexed_doc_hashes.add(doc_hash)
                 added += 1
-        
+
         logger.info(f"Stewards decisions: {added} added")
         return {"added": added, "updated": updated}
-    
+
     def _sync_race_data(self, options: SyncOptions) -> dict:
         """Sync race control data from FastF1."""
         logger.info(f"Syncing race data for {options.season}...")
-        
+
         events = self.race_loader.get_season_events(options.season)
-        
+
         if options.race_limit > 0:
             events = events[:options.race_limit]
-        
+
         added = 0
-        
+
         for event in events:
             try:
                 penalties = self.race_loader.get_race_control_messages(
                     options.season, event, "Race"
                 )
-                
+
                 for penalty in penalties:
                     if penalty.category not in ["Penalty", "Investigation", "Track Limits"]:
                         continue
-                    
+
                     doc_hash = f"race_{hash(f'{event}-{penalty.message}') % 10000}"
-                    
+
                     if not options.force_full_sync and doc_hash in self._indexed_doc_hashes:
                         continue
-                    
+
                     content = normalize_text(
                         f"Race: {penalty.race_name} ({penalty.session})\n"
                         f"Driver: {penalty.driver or 'Unknown'}\n"
@@ -1444,7 +1444,7 @@ class DataSyncService:
                         f"Message: {penalty.message}\n"
                         f"Category: {penalty.category}"
                     )
-                    
+
                     doc = Document(
                         doc_id=doc_hash,
                         content=content,
@@ -1458,11 +1458,11 @@ class DataSyncService:
                             "indexed_at": datetime.now().isoformat(),
                         },
                     )
-                    
+
                     self.vector_store.add_documents([doc], "race_data")
                     self._indexed_doc_hashes.add(doc_hash)
                     added += 1
-                    
+
                     # Also add to SQL if available
                     if self.sql_adapter:
                         self.sql_adapter.insert_penalty(
@@ -1474,28 +1474,28 @@ class DataSyncService:
                             session=penalty.session,
                             team=penalty.team or "Unknown",
                         )
-                        
+
             except Exception as e:
                 logger.warning(f"Failed to sync {event}: {e}")
                 continue
-        
+
         logger.info(f"Race data: {added} added")
         return {"added": added}
-    
+
     def _cleanup_orphans(self, options: SyncOptions) -> int:
         """Remove orphaned documents that are no longer on FIA site."""
         logger.info("Cleaning up orphaned documents...")
-        
+
         # Get current documents from FIA
         current_docs = self.fia_scraper.get_available_documents(options.season)
-        
+
         # Use the scraper's cleanup method
         removed = self.fia_scraper.cleanup_orphaned_files(current_docs)
-        
+
         # Note: Qdrant documents are upserted by ID, so orphan vectors
         # will naturally be replaced when new docs are indexed.
         # For true cleanup, we'd need to track IDs and delete explicitly.
-        
+
         return removed
 ```
 
@@ -1526,7 +1526,7 @@ router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 
 class SyncRequest(BaseModel):
     """Request model for sync operation."""
-    
+
     season: int = Field(default=2025, description="F1 season year")
     include_regulations: bool = Field(default=True)
     include_stewards: bool = Field(default=True)
@@ -1541,7 +1541,7 @@ class SyncRequest(BaseModel):
 
 class SyncResponse(BaseModel):
     """Response model for sync operation."""
-    
+
     status: str
     message: str
     result: dict | None = None
@@ -1554,17 +1554,17 @@ _sync_in_progress = False
 def _run_sync_task(options: SyncOptions) -> dict:
     """Background task to run sync."""
     global _sync_in_progress
-    
+
     try:
         _sync_in_progress = True
-        
+
         vector_store = get_vector_store()
         data_dir = settings.data_dir
-        
+
         fia_scraper = FIAAdapter(data_dir)
         race_loader = FastF1Adapter(data_dir / "fastf1_cache")
         sql_adapter = SQLiteAdapter()
-        
+
         sync_service = DataSyncService(
             vector_store=vector_store,
             fia_scraper=fia_scraper,
@@ -1572,10 +1572,10 @@ def _run_sync_task(options: SyncOptions) -> dict:
             sql_adapter=sql_adapter,
             data_dir=data_dir,
         )
-        
+
         result = sync_service.sync(options)
         return result.to_dict()
-        
+
     finally:
         _sync_in_progress = False
 
@@ -1586,23 +1586,23 @@ async def trigger_sync(
     background_tasks: BackgroundTasks,
 ) -> SyncResponse:
     """Trigger a data sync operation.
-    
+
     This runs in the background and returns immediately.
     Use /sync/status to check progress.
     """
     global _sync_in_progress
-    
+
     if _sync_in_progress:
         raise HTTPException(
             status_code=409,
             detail="A sync operation is already in progress",
         )
-    
+
     # Build options
     since_date = None
     if request.days_back:
         since_date = datetime.now() - timedelta(days=request.days_back)
-    
+
     options = SyncOptions(
         season=request.season,
         include_regulations=request.include_regulations,
@@ -1612,10 +1612,10 @@ async def trigger_sync(
         force_full_sync=request.force_full_sync,
         since_date=since_date,
     )
-    
+
     # Run in background
     background_tasks.add_task(_run_sync_task, options)
-    
+
     return SyncResponse(
         status="started",
         message=f"Sync started for season {request.season}. Check /sync/status for progress.",
@@ -1626,13 +1626,13 @@ async def trigger_sync(
 async def get_sync_status() -> SyncResponse:
     """Get the status of the sync operation."""
     global _sync_in_progress
-    
+
     if _sync_in_progress:
         return SyncResponse(
             status="in_progress",
             message="Sync operation is currently running",
         )
-    
+
     return SyncResponse(
         status="idle",
         message="No sync operation in progress",
@@ -1642,17 +1642,17 @@ async def get_sync_status() -> SyncResponse:
 @router.post("/quick", response_model=SyncResponse)
 async def quick_sync() -> SyncResponse:
     """Run a quick incremental sync (last 3 days, stewards only).
-    
+
     This is a synchronous operation for fast updates after a race weekend.
     """
     global _sync_in_progress
-    
+
     if _sync_in_progress:
         raise HTTPException(status_code=409, detail="Sync already in progress")
-    
+
     try:
         _sync_in_progress = True
-        
+
         options = SyncOptions(
             season=2025,
             include_regulations=False,
@@ -1663,15 +1663,15 @@ async def quick_sync() -> SyncResponse:
             since_date=datetime.now() - timedelta(days=3),
             race_limit=2,  # Only last 2 races
         )
-        
+
         result = _run_sync_task(options)
-        
+
         return SyncResponse(
             status="completed",
             message=f"Quick sync completed with {result['total_changes']} changes",
             result=result,
         )
-        
+
     finally:
         _sync_in_progress = False
 ```
@@ -1737,11 +1737,11 @@ resource "google_cloud_scheduler_job" "daily_sync" {
   http_target {
     uri         = "${google_cloud_run_v2_service.f1_agent[0].uri}/api/v1/sync/trigger"
     http_method = "POST"
-    
+
     headers = {
       "Content-Type" = "application/json"
     }
-    
+
     body = base64encode(jsonencode({
       season             = 2025
       include_regulations = true
@@ -1815,10 +1815,10 @@ def sync(
     cleanup: bool = typer.Option(True, help="Clean up orphaned files"),
 ):
     """Sync the knowledge base with latest F1 data.
-    
+
     Run this after a race weekend to get the latest stewards decisions
     and race control messages.
-    
+
     Examples:
         f1agent sync                    # Incremental sync (last 7 days)
         f1agent sync --full             # Full re-sync of everything
@@ -1827,24 +1827,24 @@ def sync(
     """
     from datetime import datetime, timedelta
     from pathlib import Path
-    
+
     from ....adapters.outbound.data_sources.fastf1_adapter import FastF1Adapter
     from ....adapters.outbound.data_sources.fia_adapter import FIAAdapter
     from ....adapters.outbound.sqlite_adapter import SQLiteAdapter
     from ....adapters.outbound.vector_store.qdrant_adapter import QdrantAdapter
     from ....config.settings import settings
     from ....core.services.data_sync_service import DataSyncService, SyncOptions
-    
+
     console.print("[bold]PitWallAI Data Sync[/]\n")
-    
+
     if not settings.qdrant_url or not settings.qdrant_api_key:
         console.print("[red]Error: QDRANT_URL and QDRANT_API_KEY not set[/]")
         raise typer.Exit(1)
-    
+
     try:
         # Build options
         since_date = None if full else datetime.now() - timedelta(days=days)
-        
+
         options = SyncOptions(
             season=season,
             include_regulations=regulations,
@@ -1854,23 +1854,23 @@ def sync(
             force_full_sync=full,
             since_date=since_date,
         )
-        
+
         mode = "full" if full else f"incremental (last {days} days)"
         console.print(f"[dim]Mode: {mode}[/]")
         console.print(f"[dim]Season: {season}[/]\n")
-        
+
         # Initialize services
         vector_store = QdrantAdapter(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
             embedding_api_key=settings.google_api_key,
         )
-        
+
         data_dir = Path(settings.data_dir)
         fia_scraper = FIAAdapter(data_dir)
         race_loader = FastF1Adapter(data_dir / "fastf1_cache")
         sql_adapter = SQLiteAdapter()
-        
+
         sync_service = DataSyncService(
             vector_store=vector_store,
             fia_scraper=fia_scraper,
@@ -1878,27 +1878,27 @@ def sync(
             sql_adapter=sql_adapter,
             data_dir=data_dir,
         )
-        
+
         # Run sync
         with console.status("[bold green]Syncing...[/]"):
             result = sync_service.sync(options)
-        
+
         # Report results
         console.print("\n[bold green]Sync Complete![/]\n")
         console.print(f"  Regulations: +{result.regulations_added} added, ~{result.regulations_updated} updated")
         console.print(f"  Stewards: +{result.stewards_added} added")
         console.print(f"  Race Data: +{result.race_data_added} added")
-        
+
         if result.orphans_removed:
             console.print(f"  Orphans: -{result.orphans_removed} removed")
-        
+
         if result.errors:
             console.print("\n[yellow]Warnings:[/]")
             for error in result.errors:
                 console.print(f"  [dim]{error}[/]")
-        
+
         console.print(f"\n[green]Total changes: {result.total_changes}[/]")
-        
+
     except Exception as exc:
         handle_cli_error(exc)
         raise typer.Exit(1)

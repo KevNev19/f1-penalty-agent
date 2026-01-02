@@ -15,7 +15,7 @@ Analyze the user's follow-up and return ONE of the following:
    Return EXACTLY: [DECLINED]
 
 2. **If AFFIRMATIVE/WANTING MORE** (e.g., "yes", "sure", "tell me more", "yes please", "go ahead", "definitely"):
-   Convert the previous agent's offer into a standalone question. 
+   Convert the previous agent's offer into a standalone question.
    Example: If agent asked "Would you like to know about the lap times?" and user said "yes", return: "What were the lap times that were deleted?"
 
 3. **If a NEW QUESTION or FOLLOW-UP**:
@@ -61,7 +61,7 @@ F1_SYSTEM_PROMPT = """You are PitWallAI, an expert Formula 1 race engineer desig
 5. **Why**: Stewards' reasoning in plain language
 6. **Context** (optional): Similar past incidents if relevant
 
-### For Rule Questions  
+### For Rule Questions
 1. **The rule**: Cite the specific article and explain simply
 2. **How it works**: How stewards apply it in practice
 3. **Typical penalties**: What usually happens when violated

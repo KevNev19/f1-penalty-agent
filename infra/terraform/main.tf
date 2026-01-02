@@ -30,4 +30,3 @@ provider "qdrant-cloud" {
   api_key    = var.qdrant_cloud_api_key
   account_id = var.qdrant_account_id
 }
-

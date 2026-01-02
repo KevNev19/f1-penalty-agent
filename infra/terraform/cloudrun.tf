@@ -1,6 +1,6 @@
 # Cloud Run configuration for F1 Penalty Agent
 # Deploy with: terraform apply -var="deploy_cloud_run=true"
-# 
+#
 # Note: Cloud Run requires the Docker image to exist in Artifact Registry.
 # Set deploy_cloud_run=false (default) to create infrastructure without Cloud Run.
 # After pushing the Docker image, run: terraform apply -var="deploy_cloud_run=true"
@@ -100,4 +100,3 @@ output "api_url" {
   description = "URL of the deployed F1 Agent API (empty if deploy_cloud_run=false)"
   value       = var.deploy_cloud_run ? google_cloud_run_v2_service.f1_agent[0].uri : ""
 }
-
