@@ -98,3 +98,25 @@ resource "google_secret_manager_secret_iam_member" "github_firebase_sa_access" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.f1_agent.email}"
 }
+
+# GitHub secret for Qdrant Cloud API key (for CI/CD Terraform runs)
+resource "google_secret_manager_secret" "github_qdrant_cloud_api_key" {
+  secret_id = "github-qdrant-cloud-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}
+
+# GitHub secret for Qdrant Account ID (for CI/CD Terraform runs)
+resource "google_secret_manager_secret" "github_qdrant_account_id" {
+  secret_id = "github-qdrant-account-id"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.secretmanager]
+}

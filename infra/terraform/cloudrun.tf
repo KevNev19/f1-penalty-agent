@@ -7,7 +7,7 @@
 
 resource "google_cloud_run_v2_service" "f1_agent" {
   count    = var.deploy_cloud_run ? 1 : 0
-  name     = "f1-penalty-agent"
+  name     = "pitwall-api"
   location = var.region
 
   template {
@@ -57,7 +57,7 @@ resource "google_cloud_run_v2_service" "f1_agent" {
 
       startup_probe {
         http_get {
-          path = "/health"
+          path = "/api/v1/health"
         }
         initial_delay_seconds = 10
         period_seconds        = 3
@@ -66,7 +66,7 @@ resource "google_cloud_run_v2_service" "f1_agent" {
 
       liveness_probe {
         http_get {
-          path = "/health"
+          path = "/api/v1/health"
         }
         period_seconds = 30
       }
