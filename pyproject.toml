@@ -22,7 +22,9 @@ dependencies = [
 
     # LLM
     "google-genai>=1.56.0",  # Updated from 1.0.0
-    "torch>=2.6.0",  # Minimum 2.6.0 required to fix CVE-2025-32434 (RCE via torch.load)
+    # PyTorch with platform-specific constraints for CVE-2025-32434 fix
+    "torch>=2.6.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "torch>=2.6.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",  # Intel Mac CPU-only
 
     # Utilities
     "python-dotenv>=1.0.0",

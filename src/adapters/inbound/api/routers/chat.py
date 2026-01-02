@@ -94,7 +94,10 @@ def ask_question(request: Request, body: QuestionRequest) -> AnswerResponse:
 
     except ValueError as e:
         logger.warning(f"Invalid request: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid request. Please check your input and try again.",
+        )
     except Exception as e:
         logger.exception(f"Error processing question: {e}")
         raise HTTPException(
@@ -141,7 +144,7 @@ def ask_question_stream(request: Request, body: QuestionRequest):
 
         except ValueError as e:
             logger.warning(f"Invalid streaming request: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid request. Please check your input and try again.'})}\n\n"
         except Exception as e:
             logger.exception(f"Error in streaming response: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred. Please try again.'})}\n\n"
