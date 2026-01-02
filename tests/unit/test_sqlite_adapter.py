@@ -117,9 +117,7 @@ class TestSQLSecurityValidation:
         adapter = SQLiteAdapter(db_file)
 
         with pytest.raises(ValueError, match="blocked pattern|non-allowed table"):
-            adapter.execute_query(
-                "SELECT * FROM penalties UNION ALL SELECT * FROM sqlite_master"
-            )
+            adapter.execute_query("SELECT * FROM penalties UNION ALL SELECT * FROM sqlite_master")
 
     def test_blocks_pragma_statements(self, tmp_path):
         """Test that PRAGMA statements are blocked."""
@@ -141,9 +139,7 @@ class TestSQLSecurityValidation:
         results = adapter.execute_query("SELECT count(*) FROM penalties")
         assert results[0][0] == 1
 
-        results = adapter.execute_query(
-            "SELECT driver FROM penalties WHERE season = 2025"
-        )
+        results = adapter.execute_query("SELECT driver FROM penalties WHERE season = 2025")
         assert len(results) == 1
 
     def test_allows_like_queries(self, tmp_path):
@@ -153,9 +149,7 @@ class TestSQLSecurityValidation:
 
         adapter.insert_penalty(2025, "Monaco GP", "Lando Norris", "Time", "5s penalty")
 
-        results = adapter.execute_query(
-            "SELECT driver FROM penalties WHERE driver LIKE '%Lando%'"
-        )
+        results = adapter.execute_query("SELECT driver FROM penalties WHERE driver LIKE '%Lando%'")
         assert len(results) == 1
         assert results[0][0] == "Lando Norris"
 
@@ -167,7 +161,5 @@ class TestSQLSecurityValidation:
         adapter.insert_penalty(2025, "Race 1", "Driver1", "Cat", "Msg")
         adapter.insert_penalty(2025, "Race 2", "Driver2", "Cat", "Msg")
 
-        results = adapter.execute_query(
-            "SELECT COUNT(*), team FROM penalties GROUP BY team"
-        )
+        results = adapter.execute_query("SELECT COUNT(*), team FROM penalties GROUP BY team")
         assert len(results) >= 1

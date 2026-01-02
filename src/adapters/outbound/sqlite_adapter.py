@@ -40,8 +40,15 @@ ALLOWED_TABLES = {"penalties"}
 
 # Allowed column names (whitelist)
 ALLOWED_COLUMNS = {
-    "id", "season", "race_name", "session", "driver",
-    "team", "category", "message", "created_at"
+    "id",
+    "season",
+    "race_name",
+    "session",
+    "driver",
+    "team",
+    "category",
+    "message",
+    "created_at",
 }
 
 
