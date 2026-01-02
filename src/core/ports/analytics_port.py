@@ -1,7 +1,7 @@
 """Port definition for analytics data access."""
 
 from abc import abstractmethod
-from typing import Protocol, Any
+from typing import Any, Protocol
 
 
 class AnalyticsPort(Protocol):

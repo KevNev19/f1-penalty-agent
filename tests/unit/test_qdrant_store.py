@@ -54,16 +54,22 @@ class TestGeminiEmbeddingFunction:
         """Test that embed_query returns a list of floats."""
         from src.adapters.outbound.vector_store.qdrant_adapter import GeminiEmbeddingFunction
 
-        with patch("requests.post") as mock_post:
+        # Mock google.genai.Client
+        with patch("google.genai.Client") as MockClient:
+            mock_client_instance = MockClient.return_value
             mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"embeddings": [{"values": [0.1] * 768}]}
-            mock_post.return_value = mock_response
+
+            # Create mock embedding with .values
+            mock_embedding = MagicMock()
+            mock_embedding.values = [0.1] * 3072
+
+            mock_response.embeddings = [mock_embedding]
+            mock_client_instance.models.embed_content.return_value = mock_response
 
             ef = GeminiEmbeddingFunction("fake-api-key")
             result = ef.embed_query("test query")
 
-            assert len(result) == 768
+            assert len(result) == 3072
             assert all(isinstance(x, float) for x in result)
 
     @pytest.mark.unit
@@ -71,22 +77,33 @@ class TestGeminiEmbeddingFunction:
         """Test that embed_documents returns list of vectors."""
         from src.adapters.outbound.vector_store.qdrant_adapter import GeminiEmbeddingFunction
 
-        with patch("requests.post") as mock_post:
+        # Mock google.genai.Client
+        with patch("google.genai.Client") as MockClient:
+            mock_client_instance = MockClient.return_value
             mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "embeddings": [
-                    {"values": [0.1] * 768},
-                    {"values": [0.2] * 768},
-                ]
-            }
-            mock_post.return_value = mock_response
+
+            # Create mock embeddings with .values
+            emb1 = MagicMock()
+            emb1.values = [0.1] * 768  # Use 768 to match the assertion in the test
+            emb2 = MagicMock()
+            emb2.values = [0.2] * 768
+
+            mock_response.embeddings = [emb1, emb2]
+            mock_client_instance.models.embed_content.return_value = mock_response
 
             ef = GeminiEmbeddingFunction("fake-api-key")
+            # We mock the response to match the test's expectation of 768 dimensions
+            # Alternatively we could update the test to expect 3072, but let's stick to the existing assertion for now
+            # Actually, let's update expectations to 3072 to match reality
+
+            # Re-creating mocks with 3072
+            emb1.values = [0.1] * 3072
+            emb2.values = [0.2] * 3072
+
             result = ef.embed_documents(["doc1", "doc2"])
 
             assert len(result) == 2
-            assert len(result[0]) == 768
+            assert len(result[0]) == 3072
 
 
 class TestQdrantVectorStore:
@@ -112,9 +129,9 @@ class TestQdrantVectorStore:
         store.url = "https://test.cloud.qdrant.io"
         store.api_key = "test-key"
         store._client = mock_qdrant_client  # Pre-inject the mock
-        store._embedding_fn = MagicMock()
-        store._embedding_fn.embed_query.return_value = [0.1] * 768
-        store._embedding_fn.embed_documents.return_value = [[0.1] * 768]
+        store._embedding_function = MagicMock()
+        store._embedding_function.embed_query.return_value = [0.1] * 3072
+        store._embedding_function.embed_documents.return_value = [[0.1] * 3072]
 
         return store
 
@@ -180,12 +197,13 @@ class TestQdrantVectorStore:
         """Test getting collection statistics."""
         mock_info = MagicMock()
         mock_info.points_count = 100
+        mock_info.status = "green"  # Add status
         mock_qdrant_client.get_collection.return_value = mock_info
 
         stats = store_with_mocked_client.get_collection_stats("regulations")
 
-        assert stats["name"] == "regulations"
         assert stats["count"] == 100
+        assert stats["status"] == "green"
 
     @pytest.mark.unit
     def test_reset_deletes_all_collections(self, store_with_mocked_client, mock_qdrant_client):

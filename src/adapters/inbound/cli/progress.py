@@ -6,11 +6,9 @@ for displaying intuitive, phase-based progress during data ingestion.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from rich.console import Console
 from rich.live import Live
-from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -20,8 +18,6 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.table import Table
-from rich.text import Text
 
 
 class Phase(Enum):
@@ -75,18 +71,18 @@ class SetupProgress:
     - Final summary statistics
     """
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None):
         """Initialize the progress tracker.
 
         Args:
             console: Rich console instance. Creates new one if not provided.
         """
         self.console = console or Console()
-        self._current_data_type: Optional[DataTypeStats] = None
-        self._current_phase: Optional[Phase] = None
-        self._progress: Optional[Progress] = None
-        self._task_id: Optional[TaskID] = None
-        self._live: Optional[Live] = None
+        self._current_data_type: DataTypeStats | None = None
+        self._current_phase: Phase | None = None
+        self._progress: Progress | None = None
+        self._task_id: TaskID | None = None
+        self._live: Live | None = None
         self._all_stats: list[DataTypeStats] = []
 
     def start_data_type(self, name: str, icon: str) -> None:
@@ -157,7 +153,7 @@ class SetupProgress:
 
     def update(
         self,
-        current: Optional[int] = None,
+        current: int | None = None,
         item_name: str = "",
         advance: int = 1,
     ) -> None:

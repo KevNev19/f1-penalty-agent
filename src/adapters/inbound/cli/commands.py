@@ -343,8 +343,8 @@ def _ingest_stewards_decisions(
     Returns:
         Number of documents indexed
     """
-    from .progress import Phase
     from ....core.domain import Document
+    from .progress import Phase
 
     config_hash = settings.get_config_hash()
 
@@ -442,9 +442,9 @@ def _ingest_race_data(
     Returns:
         Number of documents indexed
     """
-    from .progress import Phase
     from ....adapters.outbound.data_sources.fastf1_adapter import FastF1Adapter as FastF1Loader
     from ....core.domain import Document
+    from .progress import Phase
 
     config_hash = settings.get_config_hash()
 
