@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import './SetupControl.css';
 
 interface ProgressEvent {
@@ -44,7 +44,7 @@ export default function SetupControl() {
     const [limit, setLimit] = useState(0);
     const [finalMessage, setFinalMessage] = useState('');
     const [error, setError] = useState('');
-    const eventSourceRef = useRef<EventSource | null>(null);
+
 
     const [progress, setProgress] = useState<Record<string, DataTypeProgress>>({
         regulations: { phase: '', current: 0, total: 0, item: '', message: '', status: 'waiting' },
