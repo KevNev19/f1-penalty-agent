@@ -6,7 +6,7 @@ as the previous Pinecone store for seamless switching between backends.
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
@@ -24,18 +24,28 @@ logger = logging.getLogger(__name__)
 # Constants
 EMBEDDING_BATCH_SIZE = 20
 MAX_EMBEDDING_RETRIES = 3
-EMBEDDING_DIMENSION = 768
+EMBEDDING_DIMENSION = 3072  # gemini-embedding-001 default dimension
 
 
 class GeminiEmbeddingFunction(EmbeddingPort):
     """Custom embedding function using Google Gemini API.
 
     Shared embedding function for consistent embeddings across the application.
+    Uses the new google.genai SDK (GA May 2025).
     """
 
-    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+    def __init__(self, api_key: str, model_name: str = "gemini-embedding-001"):
         self.api_key = api_key
         self.model_name = model_name
+        self._client = None
+
+    def _get_client(self):
+        """Get or create the genai client."""
+        if self._client is None:
+            from google import genai
+
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a single query text."""
@@ -44,61 +54,49 @@ class GeminiEmbeddingFunction(EmbeddingPort):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple documents."""
-        return self._embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
+        if not texts:
+            return []
+
+        # Batch processing
+        all_embeddings = []
+        for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+            batch = texts[i : i + EMBEDDING_BATCH_SIZE]
+            try:
+                embeddings = self._embed_texts(batch, "RETRIEVAL_DOCUMENT")
+                all_embeddings.extend(embeddings)
+                time.sleep(0.5)  # Rate limiting
+            except Exception as e:
+                logger.error(f"Error embedding batch {i}: {e}")
+                # Add empty embeddings for failed batch to maintain index
+                all_embeddings.extend([[] for _ in batch])
+
+        return all_embeddings
 
     def _embed_texts(self, texts: list[str], task_type: str) -> list[list[float]]:
-        """Generate embeddings using Google Gemini REST API."""
-        import requests
+        """Generate embeddings using Google Gemini genai SDK."""
+        client = self._get_client()
 
-        api_url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
-        embeddings = []
-
-        for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
-            batch_texts = texts[i : i + EMBEDDING_BATCH_SIZE]
-
-            requests_payload = []
-            for text in batch_texts:
-                requests_payload.append(
-                    {
-                        "model": self.model_name,
-                        "content": {"parts": [{"text": text}]},
-                        "taskType": task_type,
-                        "title": "Document" if task_type == "RETRIEVAL_DOCUMENT" else None,
-                    }
+        for attempt in range(MAX_EMBEDDING_RETRIES):
+            try:
+                # Using the new google.genai SDK pattern
+                result = client.models.embed_content(
+                    model=self.model_name,
+                    contents=texts,
+                    config={"task_type": task_type},
                 )
-
-            payload = {"requests": requests_payload}
-
-            for attempt in range(MAX_EMBEDDING_RETRIES):
-                try:
-                    response = requests.post(api_url, json=payload, timeout=30)
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        if "embeddings" in data:
-                            for emb in data["embeddings"]:
-                                embeddings.append(emb.get("values", [0.0] * EMBEDDING_DIMENSION))
-                        else:
-                            embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
-                        break
-                    elif response.status_code == 429:
-                        wait_time = 2**attempt
-                        logger.warning("Rate limit hit, retrying in %ds...", wait_time)
-                        time.sleep(wait_time)
-                    else:
-                        if attempt == MAX_EMBEDDING_RETRIES - 1:
-                            embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
-                        time.sleep(1)
-                except Exception as e:
-                    logger.warning(f"Embedding request failed: {e}")
-                    if attempt == MAX_EMBEDDING_RETRIES - 1:
-                        embeddings.extend([[0.0] * EMBEDDING_DIMENSION] * len(batch_texts))
-                    time.sleep(1)
-
-        return embeddings
+                # Return embeddings from result
+                if result and hasattr(result, "embeddings"):
+                    return [emb.values for emb in result.embeddings]
+                return []
+            except Exception as e:
+                if attempt == MAX_EMBEDDING_RETRIES - 1:
+                    logger.error(f"Failed to embed texts after retries: {e}")
+                    raise
+                time.sleep(2**attempt)
+        return []
 
 
-class QdrantAdapter(VectorStorePort):
+class QdrantAdapter(VectorStorePort):  # type: ignore[misc]
     """Qdrant-based vector store for F1 documents.
 
     Uses collections to separate different document types (regulations, stewards, race_data).
@@ -106,17 +104,12 @@ class QdrantAdapter(VectorStorePort):
     """
 
     # Collection names for different document types
-    REGULATIONS_NAMESPACE = "regulations"
-    STEWARDS_NAMESPACE = "stewards_decisions"
-    RACE_DATA_NAMESPACE = "race_data"
-
-    # Aliases for backward compatibility
-    REGULATIONS_COLLECTION = REGULATIONS_NAMESPACE
-    STEWARDS_COLLECTION = STEWARDS_NAMESPACE
-    RACE_DATA_COLLECTION = RACE_DATA_NAMESPACE
+    REGULATIONS_COLLECTION = "regulations"
+    STEWARDS_COLLECTION = "stewards_decisions"
+    RACE_DATA_COLLECTION = "race_data"
 
     # Embedding dimension for Gemini text-embedding-004
-    EMBEDDING_DIMENSION = 768
+    EMBEDDING_DIMENSION = EMBEDDING_DIMENSION
 
     def __init__(
         self,
@@ -133,12 +126,12 @@ class QdrantAdapter(VectorStorePort):
         """
         self.url = url
         self.api_key = api_key
-        self._client = None
-        self._embedding_fn = GeminiEmbeddingFunction(embedding_api_key)
+        self._client: QdrantClient | None = None
+        self._embedding_function = GeminiEmbeddingFunction(embedding_api_key)
 
     def _get_client(self) -> "QdrantClient":
         """Get or create Qdrant client connection."""
-        if self._client is None:
+        if not self._client:
             try:
                 from qdrant_client import QdrantClient
 
@@ -161,37 +154,54 @@ class QdrantAdapter(VectorStorePort):
 
     def _ensure_collections(self) -> None:
         """Ensure all required collections exist."""
-        from qdrant_client.models import Distance, VectorParams
+        try:
+            client = self._get_client()
+            collections = client.get_collections().collections
+            existing = {c.name for c in collections}
 
-        for collection_name in [
-            self.REGULATIONS_NAMESPACE,
-            self.STEWARDS_NAMESPACE,
-            self.RACE_DATA_NAMESPACE,
-        ]:
-            try:
-                collections = self._client.get_collections().collections
-                exists = any(c.name == collection_name for c in collections)
+            from qdrant_client.http import models
 
-                if not exists:
-                    self._client.create_collection(
-                        collection_name=collection_name,
-                        vectors_config=VectorParams(
+            for name in [
+                self.REGULATIONS_COLLECTION,
+                self.STEWARDS_COLLECTION,
+                self.RACE_DATA_COLLECTION,
+            ]:
+                if name not in existing:
+                    logger.info(f"Creating collection {name}")
+                    client.create_collection(
+                        collection_name=name,
+                        vectors_config=models.VectorParams(
                             size=self.EMBEDDING_DIMENSION,
-                            distance=Distance.COSINE,
+                            distance=models.Distance.COSINE,
                         ),
                     )
-                    logger.debug("Created collection: %s", collection_name)
-            except Exception as e:
-                logger.warning(f"Could not ensure collection {collection_name}: {e}")
+
+                # Ensure payload indexes exist for filtering
+                # 'url' is used for existence checks
+                client.create_payload_index(
+                    collection_name=name,
+                    field_name="url",
+                    field_schema=models.PayloadSchemaType.KEYWORD,
+                )
+                # 'config_hash' is used for versioning
+                client.create_payload_index(
+                    collection_name=name,
+                    field_name="config_hash",
+                    field_schema=models.PayloadSchemaType.KEYWORD,
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to ensure collections: {e}")
+            raise e
 
     def reset(self) -> None:
         """Reset the vector store by deleting all collections and recreating them."""
         client = self._get_client()
 
         for collection_name in [
-            self.REGULATIONS_NAMESPACE,
-            self.STEWARDS_NAMESPACE,
-            self.RACE_DATA_NAMESPACE,
+            self.REGULATIONS_COLLECTION,
+            self.STEWARDS_COLLECTION,
+            self.RACE_DATA_COLLECTION,
         ]:
             try:
                 client.delete_collection(collection_name=collection_name)
@@ -206,7 +216,7 @@ class QdrantAdapter(VectorStorePort):
     def add_documents(
         self,
         documents: list[Document],
-        collection_name: str = REGULATIONS_NAMESPACE,
+        collection_name: str = REGULATIONS_COLLECTION,
     ) -> int:
         """Add documents to the vector store.
 
@@ -227,7 +237,7 @@ class QdrantAdapter(VectorStorePort):
         # Normalize content before storing to prevent BOM issues
         contents = [normalize_text(doc.content) for doc in documents]
         logger.debug("Generating embeddings for %d documents...", len(documents))
-        embeddings = self._embedding_fn.embed_documents(contents)
+        embeddings = self._embedding_function.embed_documents(contents)
 
         # Prepare points for upsert
         points = []
@@ -277,9 +287,9 @@ class QdrantAdapter(VectorStorePort):
     def search(
         self,
         query: str,
-        collection_name: str = REGULATIONS_NAMESPACE,
+        collection_name: str = REGULATIONS_COLLECTION,
         top_k: int = 5,
-        filter_metadata: dict | None = None,
+        filter_metadata: dict[str, Any] | None = None,
     ) -> list[SearchResult]:
         """Search for relevant documents.
 
@@ -297,7 +307,7 @@ class QdrantAdapter(VectorStorePort):
         client = self._get_client()
 
         # Generate query embedding
-        query_embedding = self._embedding_fn.embed_query(query)
+        query_embedding = self._embedding_function.embed_query(query)
 
         # Build filter if provided
         qdrant_filter = None
@@ -387,9 +397,9 @@ class QdrantAdapter(VectorStorePort):
         all_results = []
 
         for collection_name in [
-            self.REGULATIONS_NAMESPACE,
-            self.STEWARDS_NAMESPACE,
-            self.RACE_DATA_NAMESPACE,
+            self.REGULATIONS_COLLECTION,
+            self.STEWARDS_COLLECTION,
+            self.RACE_DATA_COLLECTION,
         ]:
             try:
                 results = self.search(query, collection_name, top_k)
@@ -401,7 +411,7 @@ class QdrantAdapter(VectorStorePort):
         all_results.sort(key=lambda x: x.score, reverse=True)
         return all_results[:top_k]
 
-    def get_collection_stats(self, collection_name: str) -> dict:
+    def get_collection_stats(self, collection_name: str) -> dict[str, Any]:
         """Get statistics for a collection.
 
         Args:
@@ -412,14 +422,51 @@ class QdrantAdapter(VectorStorePort):
         """
         try:
             client = self._get_client()
-            info = client.get_collection(collection_name=collection_name)
+            stats = client.get_collection(collection_name=collection_name)
             return {
-                "name": collection_name,
-                "count": info.points_count,
+                "count": stats.points_count,
+                "status": str(stats.status),
             }
         except Exception as e:
-            logger.warning(f"Failed to get stats for collection {collection_name}: {e}")
-            return {"name": collection_name, "count": 0, "error": str(e)}
+            # Collection might not exist
+            logger.warning(f"Failed to get stats for {collection_name}: {e}")
+            return {"count": 0, "status": "unknown"}
+
+    def document_exists(self, collection_name: str, url: str, config_hash: str) -> bool:
+        """Check if a document exists with the given URL and config hash.
+
+        Args:
+            collection_name: Collection to search in.
+            url: Source URL of the document.
+            config_hash: Hash of the configuration used for ingestion.
+
+        Returns:
+            True if document exists with matching config, False otherwise.
+        """
+        from qdrant_client.http import models
+
+        try:
+            client = self._get_client()
+            # Use scroll to find at least one point matching the filter
+            # We filter by URL (source identifier) AND config_hash (to ensure re-index on change)
+            results, _ = client.scroll(
+                collection_name=collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="url", match=models.MatchValue(value=url)),
+                        models.FieldCondition(
+                            key="config_hash", match=models.MatchValue(value=config_hash)
+                        ),
+                    ]
+                ),
+                limit=1,
+                with_payload=False,
+                with_vectors=False,
+            )
+            return len(results) > 0
+        except Exception as e:
+            logger.warning(f"Error checking document existence: {e}")
+            return False
 
     def clear_collection(self, collection_name: str) -> None:
         """Clear all documents from a collection.

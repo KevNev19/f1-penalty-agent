@@ -1,19 +1,23 @@
 """Port definition for analytics data access."""
 
-from typing import Protocol
+from abc import abstractmethod
+from typing import Protocol, Any
 
 
 class AnalyticsPort(Protocol):
-    """Port for accessing analytics data (SQL)."""
+    """Port for accessing analytics."""
 
-    def execute_query(self, query: str, params: tuple = ()) -> list[tuple]:
-        """Execute a read-only query.
+    @abstractmethod
+    def track_event(
+        self,
+        event_type: str,
+        user_id: str | None = None,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        """Track an analytics event."""
+        pass
 
-        Args:
-            query: SQL query string.
-            params: Query parameters.
-
-        Returns:
-            List of result rows.
-        """
-        ...
+    @abstractmethod
+    def get_metrics(self, metric_name: str, period: tuple[Any, Any] | None = None) -> Any:
+        """Get metrics for a specific period."""
+        pass

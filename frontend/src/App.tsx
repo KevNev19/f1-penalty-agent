@@ -1,13 +1,19 @@
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import { ChatInterface } from './components/ChatInterface';
-import { AdminPage } from './pages/AdminPage';
+import { StatusPage } from './pages/StatusPage';
+import { SetupPage } from './pages/SetupPage';
 import { ChatProvider } from './context/ChatContext';
 
-// Wrapper component to handle back navigation logic
-const AdminPageWrapper = () => {
+// Wrappers needed for navigation prop
+const StatusPageWrapper = () => {
   const navigate = useNavigate();
-  return <AdminPage onBack={() => navigate('/')} />;
+  return <StatusPage onBack={() => navigate('/')} />;
+};
+
+const SetupPageWrapper = () => {
+  const navigate = useNavigate();
+  return <SetupPage onBack={() => navigate('/')} />;
 };
 
 // Home component - compact header + full-height chat
@@ -69,7 +75,9 @@ function AppContent() {
       <main className="pt-16 h-screen overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/admin" element={<AdminPageWrapper />} />
+          <Route path="/status" element={<StatusPageWrapper />} />
+          <Route path="/setup" element={<SetupPageWrapper />} />
+          <Route path="/admin" element={<StatusPageWrapper />} /> {/* Fallback/Alias */}
         </Routes>
       </main>
 

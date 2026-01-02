@@ -1,4 +1,4 @@
-"""Pydantic models for API requests and responses."""
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -95,6 +95,8 @@ class ErrorResponse(BaseModel):
 
     error: ErrorDetail = Field(..., description="Error details including type, code, and message")
     location: ErrorLocation | None = Field(None, description="Source location of the error")
-    context: dict | None = Field(None, description="Additional debugging context")
-    cause: dict | None = Field(None, description="Underlying exception that caused this error")
+    context: dict[str, Any] | None = Field(None, description="Additional debugging context")
+    cause: dict[str, Any] | None = Field(
+        None, description="Underlying exception that caused this error"
+    )
     stack_trace: list[str] | None = Field(None, description="Stack trace (debug mode only)")

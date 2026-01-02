@@ -7,6 +7,7 @@ This module provides a safe wrapper that falls back to standard logging.
 
 import logging
 import sys
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,11 @@ _IS_HEADLESS = not sys.stdout.isatty() or _stdout_encoding not in ("utf-8", "utf
 class SafeConsole:
     """Wrapper that safely handles console output in any environment."""
 
-    def __init__(self):
-        self._console = None
+    def __init__(self) -> None:
+        self._console: Any = None
         self._initialized = False
 
-    def _get_console(self):
+    def _get_console(self) -> Any:
         """Lazy-load Rich console only if needed."""
         if self._initialized:
             return self._console
@@ -44,7 +45,7 @@ class SafeConsole:
 
         return self._console
 
-    def print(self, *args, **kwargs):
+    def print(self, *args: Any, **kwargs: Any) -> None:
         """Safe print that falls back to logger if needed."""
         console = self._get_console()
         if console:

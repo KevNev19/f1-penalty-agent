@@ -55,7 +55,7 @@ class TestHealthEndpoints:
     @pytest.mark.integration
     def test_health_check(self, client):
         """Test basic health check returns 200."""
-        response = client.get("/health")
+        response = client.get("/api/v1/health")
 
         assert response.status_code == 200
         data = response.json()
@@ -65,7 +65,7 @@ class TestHealthEndpoints:
     @pytest.mark.integration
     def test_readiness_check(self, client):
         """Test readiness probe returns vector store status."""
-        response = client.get("/ready")
+        response = client.get("/api/v1/ready")
 
         assert response.status_code == 200
         data = response.json()
@@ -137,7 +137,7 @@ class TestCORSConfiguration:
     def test_cors_preflight_allowed_origin(self, client):
         """Test CORS preflight from allowed Firebase origin."""
         response = client.options(
-            "/ready",
+            "/api/v1/ready",
             headers={
                 "Origin": "https://gen-lang-client-0855046443.web.app",
                 "Access-Control-Request-Method": "GET",
@@ -153,7 +153,7 @@ class TestCORSConfiguration:
     def test_cors_preflight_localhost_allowed(self, client):
         """Test CORS preflight from localhost is allowed for development."""
         response = client.options(
-            "/health",
+            "/api/v1/health",
             headers={
                 "Origin": "http://localhost:5173",
                 "Access-Control-Request-Method": "GET",
@@ -166,7 +166,7 @@ class TestCORSConfiguration:
     def test_cors_preflight_disallowed_origin(self, client):
         """Test CORS preflight from disallowed origin is not reflected."""
         response = client.options(
-            "/health",
+            "/api/v1/health",
             headers={
                 "Origin": "https://evil.com",
                 "Access-Control-Request-Method": "GET",

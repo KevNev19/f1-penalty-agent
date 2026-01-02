@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api, type HealthResponse } from '../services/api';
 
-// ... (Rest of file unchanged until the log section)
-
-
-interface AdminPageProps {
+interface StatusPageProps {
     onBack: () => void;
 }
 
-export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
+export const StatusPage: React.FC<StatusPageProps> = ({ onBack }) => {
     const [health, setHealth] = useState<HealthResponse | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [loading, setLoading] = useState(true);
@@ -62,10 +59,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack }) => {
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-4">
                 <div>
                     <h1 className="text-5xl font-black italic text-white uppercase tracking-tighter">
-                        System Operations
+                        Status
                     </h1>
                     <p className="text-f1-silver font-medium mt-2 tracking-wide border-l-4 border-f1-red pl-3">
-                        Pit Wall Telemetry & Diagnostics
+                        System Telemetry & Diagnostics
                     </p>
                 </div>
                 <button

@@ -55,12 +55,82 @@ class ApiService {
     }
 
     async checkHealth(): Promise<HealthResponse> {
-        return this.request<HealthResponse>('/health');
+        return this.request<HealthResponse>('/api/v1/health');
     }
 
     async checkReadiness(): Promise<HealthResponse> {
-        return this.request<HealthResponse>('/ready');
+        return this.request<HealthResponse>('/api/v1/ready');
+    }
+
+    /**
+     * Ask a question with streaming response using Server-Sent Events.
+     * @param question - The question to ask
+     * @param onChunk - Callback called for each text chunk received
+     * @param onDone - Callback called when streaming is complete
+     * @param onError - Callback called on error
+     */
+    async askQuestionStream(
+        question: string,
+        onChunk: (chunk: string) => void,
+        onDone: () => void,
+        onError: (error: string) => void
+    ): Promise<void> {
+        const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
+        const url = `${cleanBaseUrl}/api/v1/ask/stream`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, messages: [] }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) {
+                throw new Error('No response body');
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.type === 'chunk') {
+                                onChunk(parsed.content);
+                            } else if (parsed.type === 'done') {
+                                onDone();
+                                return;
+                            } else if (parsed.type === 'error') {
+                                onError(parsed.message);
+                                return;
+                            }
+                        } catch {
+                            // Ignore parse errors for incomplete data
+                        }
+                    }
+                }
+            }
+            onDone();
+        } catch (err: any) {
+            onError(err.message || 'Streaming failed');
+        }
     }
 }
 
 export const api = new ApiService();
+

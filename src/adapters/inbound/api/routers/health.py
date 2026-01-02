@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from ..deps import get_vector_store
 from ..models import HealthResponse
 
-router = APIRouter(tags=["health"])
+router: APIRouter = APIRouter(prefix="/api/v1", tags=["health"])
 
 
 @router.get("/health", response_model=HealthResponse)

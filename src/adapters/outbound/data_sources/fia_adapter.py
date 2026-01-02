@@ -6,7 +6,8 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
-from bs4 import BeautifulSoup
+from typing import Any, cast
+from bs4 import BeautifulSoup, Tag
 from pypdf import PdfReader
 from rich.console import Console
 
@@ -54,7 +55,7 @@ class FIAAdapter(RegulationsSourcePort):
         """Enter context manager."""
         return self
 
-    def __exit__(self, *args) -> None:
+    def __exit__(self, *args: Any) -> None:
         """Exit context manager and close session."""
         self.close()
 
@@ -84,7 +85,7 @@ class FIAAdapter(RegulationsSourcePort):
             doc_links = soup.find_all("a", href=re.compile(r"\.pdf$", re.I))
 
             for link in doc_links:
-                href = link.get("href", "")
+                href = str(link.get("href", ""))
                 title = link.get_text(strip=True) or href.split("/")[-1]
 
                 # Filter for F1 sporting regulations
@@ -245,7 +246,7 @@ class FIAAdapter(RegulationsSourcePort):
             all_links = soup.find_all("a", href=re.compile(r"\.pdf$", re.I))
 
             for link in all_links:
-                href = link.get("href", "")
+                href = str(link.get("href", ""))
                 title = link.get_text(strip=True) or href.split("/")[-1]
 
                 # Check for relevant keywords
@@ -340,7 +341,7 @@ class FIAAdapter(RegulationsSourcePort):
             all_links = soup.find_all("a", href=re.compile(r"\.pdf$", re.I))
 
             for link in all_links:
-                href = link.get("href", "")
+                href = str(link.get("href", ""))
                 title = link.get_text(strip=True) or href.split("/")[-1]
 
                 event_name = self._parse_event_name(href, title)

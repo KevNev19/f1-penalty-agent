@@ -34,13 +34,22 @@ const Navbar: React.FC = () => {
                         Assistant
                     </Link>
                     <Link
-                        to="/admin"
-                        className={`px-3 py-2 text-xs md:text-sm font-semibold uppercase tracking-wider rounded-md transition-all duration-200 ${location.pathname === '/admin'
+                        to="/status"
+                        className={`px-3 py-2 text-xs md:text-sm font-semibold uppercase tracking-wider rounded-md transition-all duration-200 ${location.pathname === '/status'
                             ? 'text-white bg-f1-red/20 border border-f1-red/40'
                             : 'text-f1-silver hover:text-white hover:bg-white/5'
                             }`}
                     >
                         Status
+                    </Link>
+                    <Link
+                        to="/setup"
+                        className={`px-3 py-2 text-xs md:text-sm font-semibold uppercase tracking-wider rounded-md transition-all duration-200 ${location.pathname === '/setup'
+                            ? 'text-white bg-f1-red/20 border border-f1-red/40'
+                            : 'text-f1-silver hover:text-white hover:bg-white/5'
+                            }`}
+                    >
+                        Setup
                     </Link>
                 </div>
             </div>

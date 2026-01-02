@@ -1,7 +1,9 @@
 """CLI interface for the F1 Penalty Agent."""
 
+import hashlib
 import json
 import os
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -9,6 +11,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from ....config.settings import settings
 from ....core.domain.utils import chunk_text, normalize_text
 from ...common.exception_handler import format_exception_json
 
@@ -100,7 +103,7 @@ def get_agent():
 
 
 @app.command()
-def chat():
+def chat() -> None:
     """Start an interactive chat session with the F1 agent."""
     console.print(
         Panel.fit(
@@ -160,7 +163,7 @@ def chat():
 @app.command()
 def ask(
     question: str = typer.Argument(..., help="Question about F1 penalties or rules"),
-):
+) -> None:
     """Ask a single question and get an answer."""
     try:
         agent = get_agent()
@@ -180,7 +183,7 @@ def ask(
 
 
 @app.command()
-def status():
+def status() -> None:
     """Show the current status of the knowledge base."""
     from ....adapters.outbound.vector_store.qdrant_adapter import QdrantAdapter as QdrantVectorStore
     from ....config.settings import settings
@@ -226,76 +229,169 @@ def status():
         handle_cli_error(exc)
 
 
-def _ingest_regulations(scraper, vector_store, limit: int, season: int) -> int:
-    """Ingest FIA regulations."""
+def _ingest_regulations(
+    scraper: Any, vector_store: Any, limit: int, season: int, progress: Any
+) -> int:
+    """Ingest FIA regulations with progress tracking.
+
+    Args:
+        scraper: FIA scraper instance
+        vector_store: Vector store instance
+        limit: Number of items to process (0 = all)
+        season: F1 season year
+        progress: SetupProgress instance
+
+    Returns:
+        Number of documents indexed
+    """
     from ....core.domain import Document
+    from .progress import Phase
 
-    console.print("[bold]Scraping FIA regulations...[/]")
+    config_hash = settings.get_config_hash()
+
     try:
+        # DISCOVERY PHASE
+        progress.start_phase(Phase.DISCOVERY, 0, f"Scanning regulations for {season}...")
         regulations = scraper.scrape_regulations(season)
-        # Apply limit: 0 means all, otherwise limit*2 regulations
         regs_to_process = regulations if limit == 0 else regulations[: limit * 2]
+        progress.end_phase(f"Found {len(regs_to_process)} regulations")
 
+        if not regs_to_process:
+            return 0
+
+        # DOWNLOAD PHASE
+        progress.start_phase(Phase.DOWNLOAD, len(regs_to_process))
         reg_docs = []
-        for reg in regs_to_process:
-            with console.status(f"[dim]Downloading {reg.title[:40]}...[/]"):
+        skipped = 0
+        chunks_count = 0
+
+        for i, reg in enumerate(regs_to_process):
+            # Check if exists with current config
+            if vector_store.document_exists("regulations", reg.url, config_hash):
+                skipped += 1
+                progress.mark_skipped(reg.title)
+                continue
+
+            try:
+                progress.update(item_name=reg.title)
                 scraper.download_document(reg)
                 scraper.extract_text(reg)
+
                 if reg.text_content:
                     # Normalize text to remove BOM and clean whitespace
                     clean_text = normalize_text(reg.text_content)
                     # Chunk long documents for better search
-                    chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-                    for i, chunk in enumerate(chunks):
+                    chunks = chunk_text(
+                        clean_text,
+                        chunk_size=settings.chunk_size,
+                        chunk_overlap=settings.chunk_overlap,
+                    )
+
+                    # Use stable MD5 hash for ID
+                    doc_hash = hashlib.md5(reg.url.encode()).hexdigest()[:10]
+
+                    for j, chunk in enumerate(chunks):
                         reg_docs.append(
                             Document(
-                                doc_id=f"reg-{hash(reg.url) % 10000}-{i}",
+                                doc_id=f"reg-{doc_hash}-{j}",
                                 content=chunk,
                                 metadata={
                                     "source": normalize_text(reg.title),
                                     "type": "regulation",
                                     "url": reg.url,
                                     "season": season,
-                                    "chunk_index": i,
+                                    "chunk_index": j,
                                     "total_chunks": len(chunks),
+                                    "config_hash": config_hash,
                                 },
                             )
                         )
+                    chunks_count += len(chunks)
+                    progress.mark_new(reg.title)
+            except Exception as e:
+                progress.mark_failed(reg.title, str(e))
 
+        progress.end_phase()
+        progress.set_skipped_count(skipped)
+
+        # EMBED & INDEX PHASE
         if reg_docs:
+            progress.start_phase(Phase.INDEX, 1, f"Indexing {len(reg_docs)} chunks...")
             vector_store.add_documents(reg_docs, collection_name="regulations")
-            count = len(reg_docs)
-            console.print(f"  [green]+{count}[/] regulations indexed")
-            return count
+            progress.set_indexed_count(len(reg_docs), chunks_count)
+            progress.end_phase(f"+{len(reg_docs)} documents")
+            return len(reg_docs)
+
         return 0
     except Exception as exc:
         console.print(f"  [yellow]Warning: {exc}[/]")
         return 0
 
 
-def _ingest_stewards_decisions(scraper, vector_store, limit: int, season: int) -> int:
-    """Ingest stewards decisions."""
+def _ingest_stewards_decisions(
+    scraper: Any, vector_store: Any, limit: int, season: int, progress: Any
+) -> int:
+    """Ingest stewards decisions with progress tracking.
+
+    Args:
+        scraper: FIA scraper instance
+        vector_store: Vector store instance
+        limit: Number of items to process (0 = all)
+        season: F1 season year
+        progress: SetupProgress instance
+
+    Returns:
+        Number of documents indexed
+    """
+    from .progress import Phase
     from ....core.domain import Document
 
-    console.print("[bold]Scraping stewards decisions...[/]")
-    try:
-        decisions = scraper.scrape_stewards_decisions(season)
-        # Apply limit: 0 means all, otherwise limit*5 decisions
-        decs_to_process = decisions if limit == 0 else decisions[: limit * 5]
+    config_hash = settings.get_config_hash()
 
+    try:
+        # DISCOVERY PHASE
+        progress.start_phase(Phase.DISCOVERY, 0, f"Scanning stewards decisions for {season}...")
+        decisions = scraper.scrape_stewards_decisions(season)
+        decs_to_process = decisions if limit == 0 else decisions[: limit * 5]
+        progress.end_phase(f"Found {len(decs_to_process)} decisions")
+
+        if not decs_to_process:
+            return 0
+
+        # DOWNLOAD PHASE
+        progress.start_phase(Phase.DOWNLOAD, len(decs_to_process))
         dec_docs = []
+        skipped = 0
+        chunks_count = 0
+
         for dec in decs_to_process:
-            with console.status(f"[dim]Downloading {dec.title[:40]}...[/]"):
+            # Check if exists with current config
+            if vector_store.document_exists("stewards_decisions", dec.url, config_hash):
+                skipped += 1
+                progress.mark_skipped(dec.title)
+                continue
+
+            try:
+                progress.update(item_name=dec.title)
                 scraper.download_document(dec)
                 scraper.extract_text(dec)
+
                 if dec.text_content:
                     # Normalize and chunk stewards decisions
                     clean_text = normalize_text(dec.text_content)
-                    chunks = chunk_text(clean_text, chunk_size=1500, chunk_overlap=200)
-                    for i, chunk in enumerate(chunks):
+                    chunks = chunk_text(
+                        clean_text,
+                        chunk_size=settings.chunk_size,
+                        chunk_overlap=settings.chunk_overlap,
+                    )
+
+                    # Stable MD5 hash
+                    doc_hash = hashlib.md5(dec.url.encode()).hexdigest()[:10]
+
+                    for j, chunk in enumerate(chunks):
                         dec_docs.append(
                             Document(
-                                doc_id=f"dec-{hash(dec.url) % 10000}-{i}",
+                                doc_id=f"dec-{doc_hash}-{j}",
                                 content=chunk,
                                 metadata={
                                     "source": normalize_text(dec.title),
@@ -303,33 +399,65 @@ def _ingest_stewards_decisions(scraper, vector_store, limit: int, season: int) -
                                     "event": normalize_text(dec.event_name or ""),
                                     "url": dec.url,
                                     "season": season,
-                                    "chunk_index": i,
+                                    "chunk_index": j,
+                                    "config_hash": config_hash,
                                 },
                             )
                         )
+                    chunks_count += len(chunks)
+                    progress.mark_new(dec.title)
+            except Exception as e:
+                progress.mark_failed(dec.title, str(e))
 
+        progress.end_phase()
+        progress.set_skipped_count(skipped)
+
+        # INDEX PHASE
         if dec_docs:
+            progress.start_phase(Phase.INDEX, 1, f"Indexing {len(dec_docs)} chunks...")
             vector_store.add_documents(dec_docs, collection_name="stewards_decisions")
-            count = len(dec_docs)
-            console.print(f"  [green]+{count}[/] stewards decisions indexed")
-            return count
+            progress.set_indexed_count(len(dec_docs), chunks_count)
+            progress.end_phase(f"+{len(dec_docs)} documents")
+            return len(dec_docs)
+
         return 0
     except Exception as exc:
         console.print(f"  [yellow]Warning: {exc}[/]")
         return 0
 
 
-def _ingest_race_data(cache_dir, vector_store, sql_adapter, limit: int, season: int) -> int:
-    """Ingest race control data."""
+def _ingest_race_data(
+    cache_dir: Any, vector_store: Any, sql_adapter: Any, limit: int, season: int, progress: Any
+) -> int:
+    """Ingest race control data with progress tracking.
+
+    Args:
+        cache_dir: FastF1 cache directory
+        vector_store: Vector store instance
+        sql_adapter: SQL adapter instance
+        limit: Number of races to process (0 = all)
+        season: F1 season year
+        progress: SetupProgress instance
+
+    Returns:
+        Number of documents indexed
+    """
+    from .progress import Phase
     from ....adapters.outbound.data_sources.fastf1_adapter import FastF1Adapter as FastF1Loader
     from ....core.domain import Document
 
-    console.print("[bold]Loading race control data...[/]")
+    config_hash = settings.get_config_hash()
+
     try:
+        # DISCOVERY PHASE
+        progress.start_phase(Phase.DISCOVERY, 0, f"Scanning race events for {season}...")
         loader = FastF1Loader(cache_dir)
         events = loader.get_season_events(season)
-        # Apply limit: 0 means all races, otherwise limit races
         events_to_process = events if limit == 0 else events[:limit]
+        progress.end_phase(f"Found {len(events_to_process)} races")
+
+        if not events_to_process:
+            return 0
 
         # Load Jolpica for driver context
         from ....adapters.outbound.data_sources.jolpica_adapter import (
@@ -340,72 +468,103 @@ def _ingest_race_data(cache_dir, vector_store, sql_adapter, limit: int, season: 
         drivers = jolpica.get_drivers(season)
         driver_map = {d.code: d.name for d in drivers}
         driver_map.update({str(d.number): d.name for d in drivers if d.number})
-
-        # Load Teams
         team_map = jolpica.get_driver_teams_map(season)
 
+        # DOWNLOAD PHASE (loading race data)
+        progress.start_phase(Phase.DOWNLOAD, len(events_to_process))
         race_docs = []
+        skipped = 0
+        new_count = 0
+
         for event in events_to_process:
-            with console.status(f"[dim]Loading {event}...[/]"):
-                try:
-                    penalties = loader.get_race_control_messages(season, event, "Race")
-                    for penalty in penalties:
-                        if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
-                            # Resolve driver name using Jolpica data
-                            driver_name = penalty.driver
-                            if driver_name and driver_name in driver_map:
-                                driver_name = driver_map[driver_name]
+            try:
+                progress.update(item_name=event)
+                penalties = loader.get_race_control_messages(season, event, "Race")
+                event_new = 0
 
-                            # Resolve team
-                            team_name = penalty.team or "Unknown"
-                            if team_name == "Unknown" and driver_name in team_map:
-                                team_name = team_map[driver_name]
+                for penalty in penalties:
+                    if penalty.category in ["Penalty", "Investigation", "Track Limits"]:
+                        # Resolve driver name using Jolpica data
+                        driver_name = penalty.driver
+                        if driver_name and driver_name in driver_map:
+                            driver_name = driver_map[driver_name]
 
-                            content = normalize_text(
-                                f"Race: {penalty.race_name} ({penalty.session})\n"
-                                f"Driver: {driver_name or 'Unknown'}\n"
-                                f"Team: {team_name}\n"
-                                f"Message: {penalty.message}\n"
-                                f"Category: {penalty.category}"
+                        # Resolve team
+                        team_name = penalty.team or "Unknown"
+                        if team_name == "Unknown" and driver_name in team_map:
+                            team_name = team_map[driver_name]
+
+                        # Create synthetic URL for uniqueness check
+                        msg_content = f"{event}-{penalty.session}-{penalty.message}"
+                        msg_hash = hashlib.md5(msg_content.encode()).hexdigest()[:10]
+                        synthetic_url = f"fastf1://{season}/{event}/{penalty.session}/{msg_hash}"
+
+                        # Check if exists
+                        if vector_store.document_exists("race_data", synthetic_url, config_hash):
+                            skipped += 1
+                            continue
+
+                        content = normalize_text(
+                            f"Race: {penalty.race_name} ({penalty.session})\n"
+                            f"Driver: {driver_name or 'Unknown'}\n"
+                            f"Team: {team_name}\n"
+                            f"Message: {penalty.message}\n"
+                            f"Category: {penalty.category}"
+                        )
+
+                        doc_id = f"race-{msg_hash}"
+
+                        race_docs.append(
+                            Document(
+                                doc_id=doc_id,
+                                content=content,
+                                metadata={
+                                    "source": normalize_text(
+                                        f"{penalty.race_name} {penalty.session}"
+                                    ),
+                                    "type": "race_control",
+                                    "driver": normalize_text(driver_name or ""),
+                                    "team": normalize_text(team_name),
+                                    "race": normalize_text(penalty.race_name),
+                                    "season": season,
+                                    "url": synthetic_url,
+                                    "config_hash": config_hash,
+                                },
                             )
-                            race_docs.append(
-                                Document(
-                                    doc_id=f"race-{hash(f'{event}-{penalty.message}') % 10000}",
-                                    content=content,
-                                    metadata={
-                                        "source": normalize_text(
-                                            f"{penalty.race_name} {penalty.session}"
-                                        ),
-                                        "type": "race_control",
-                                        "driver": normalize_text(driver_name or ""),
-                                        "team": normalize_text(team_name),
-                                        "race": normalize_text(penalty.race_name),
-                                        "season": season,
-                                    },
-                                )
+                        )
+
+                        event_new += 1
+
+                        # Insert into SQL Database
+                        if sql_adapter:
+                            sql_adapter.insert_penalty(
+                                season=season,
+                                race_name=penalty.race_name,
+                                driver=driver_name or "Unknown",
+                                category=penalty.category,
+                                message=penalty.message,
+                                session=penalty.session,
+                                team=team_name,
                             )
 
-                            # Insert into SQL Database
-                            if sql_adapter:
-                                sql_adapter.insert_penalty(
-                                    season=season,
-                                    race_name=penalty.race_name,
-                                    driver=driver_name or "Unknown",
-                                    category=penalty.category,
-                                    message=penalty.message,
-                                    session=penalty.session,
-                                    team=team_name,
-                                )
+                if event_new > 0:
+                    new_count += event_new
 
-                except Exception as e:
-                    console.print(f"  [dim]Skipped {event}: {e}[/]")
-                    continue
+            except Exception as e:
+                progress.mark_failed(event, str(e))
+                continue
 
+        progress.end_phase()
+        progress.set_skipped_count(skipped)
+
+        # INDEX PHASE
         if race_docs:
+            progress.start_phase(Phase.INDEX, 1, f"Indexing {len(race_docs)} messages...")
             vector_store.add_documents(race_docs, collection_name="race_data")
-            count = len(race_docs)
-            console.print(f"  [green]+{count}[/] race control messages indexed")
-            return count
+            progress.set_indexed_count(len(race_docs))
+            progress.end_phase(f"+{len(race_docs)} documents")
+            return len(race_docs)
+
         return 0
     except Exception as exc:
         console.print(f"  [yellow]Warning: {exc}[/]")
@@ -417,7 +576,7 @@ def setup(
     limit: int = typer.Option(0, help="Number of races to index (0 = all)"),
     reset: bool = typer.Option(False, help="Clear existing data before indexing"),
     season: int = typer.Option(2025, help="F1 season year to index"),
-):
+) -> None:
     """Index real F1 data into the knowledge base.
 
     This command scrapes FIA regulations and stewards decisions,
@@ -484,21 +643,34 @@ def setup(
 
         counts = {"regulations": 0, "stewards_decisions": 0, "race_data": 0}
 
+        # Create progress tracker
+        from .progress import SetupProgress
+
+        progress = SetupProgress(console)
+
         # --- 1. Index FIA Regulations ---
+        progress.start_data_type("Regulations", "📚")
         scraper = FIAScraper(data_dir)
-        counts["regulations"] = _ingest_regulations(scraper, vector_store, limit, season)
+        counts["regulations"] = _ingest_regulations(scraper, vector_store, limit, season, progress)
 
         # --- 2. Index Stewards Decisions ---
+        progress.start_data_type("Stewards Decisions", "📋")
         counts["stewards_decisions"] = _ingest_stewards_decisions(
-            scraper, vector_store, limit, season
+            scraper, vector_store, limit, season, progress
         )
 
         # --- 3. Index Race Data (penalties from FastF1) ---
-        counts["race_data"] = _ingest_race_data(cache_dir, vector_store, sql_adapter, limit, season)
+        progress.start_data_type("Race Data", "🏎️")
+        counts["race_data"] = _ingest_race_data(
+            cache_dir, vector_store, sql_adapter, limit, season, progress
+        )
 
-        total = sum(counts.values())
-        console.print(f"\n[green bold]Setup complete! Indexed {total} documents.[/]")
-        console.print("[dim]Run 'f1agent ask \"What is the penalty for track limits?\"' to test[/]")
+        # Show final summary
+        progress.finish()
+
+        console.print(
+            "\n[dim]Run 'pitwall ask \"What is the penalty for track limits?\"' to test[/]"
+        )
 
     except Exception as exc:
         handle_cli_error(exc)

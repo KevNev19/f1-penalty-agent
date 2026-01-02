@@ -71,7 +71,7 @@ def setup_logging(
 
     # Create formatter
     if json_format:
-        formatter = JSONExceptionFormatter()
+        formatter: logging.Formatter = JSONExceptionFormatter()
     else:
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(module)s:%(funcName)s | %(message)s",

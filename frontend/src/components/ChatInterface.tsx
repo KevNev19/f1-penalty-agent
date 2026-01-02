@@ -30,21 +30,48 @@ export const ChatInterface: React.FC = () => {
         setIsLoading(true);
 
         try {
-            // Prepare history (exclude the current user message being added and temp loading message)
-            // Limit to last 6 messages to keep context focused
-            const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+            // Use streaming API for smoother UX
+            let accumulatedContent = '';
 
-            const data = await api.askQuestion(userMessage.content, history);
-            setMessages(prev => {
-                const newMessages = [...prev];
-                // Replace temp loading message with actual response
-                newMessages[newMessages.length - 1] = {
-                    role: 'agent',
-                    content: data.answer,
-                    sources: data.sources
-                };
-                return newMessages;
-            });
+            await api.askQuestionStream(
+                userMessage.content,
+                // onChunk - update message content as chunks arrive
+                (chunk: string) => {
+                    accumulatedContent += chunk;
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            role: 'agent',
+                            content: accumulatedContent,
+                            isLoading: false,
+                        };
+                        return newMessages;
+                    });
+                },
+                // onDone - finalize the message
+                () => {
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            role: 'agent',
+                            content: accumulatedContent,
+                            isLoading: false,
+                        };
+                        return newMessages;
+                    });
+                },
+                // onError - show error message
+                (error: string) => {
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            role: 'agent',
+                            content: `Error: ${error}`,
+                        };
+                        return newMessages;
+                    });
+                }
+            );
         } catch (err: any) {
             setMessages(prev => {
                 const newMessages = [...prev];

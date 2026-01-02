@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import requests
 from rich.console import Console
@@ -51,7 +52,7 @@ class JolpicaAdapter:
         """Enter context manager."""
         return self
 
-    def __exit__(self, *args) -> None:
+    def __exit__(self, *args: Any) -> None:
         """Exit context manager and close session."""
         self.close()
 
@@ -60,7 +61,7 @@ class JolpicaAdapter:
         if self.session:
             self.session.close()
 
-    def _get(self, endpoint: str) -> dict | None:
+    def _get(self, endpoint: str) -> dict[str, Any] | None:
         """Make a GET request to the API.
 
         Args:
@@ -73,7 +74,7 @@ class JolpicaAdapter:
         try:
             response = self.session.get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
-            return response.json()
+            return response.json()  # type: ignore[no-any-return]
         except requests.RequestException as e:
             console.print(f"[red]API error: {e}[/]")
             return None
@@ -143,7 +144,7 @@ class JolpicaAdapter:
 
         return races
 
-    def get_driver_standings(self, season: int = 2025) -> list[dict]:
+    def get_driver_standings(self, season: int = 2025) -> list[dict[str, Any]]:
         """Get driver standings for a season.
 
         Args:
@@ -159,13 +160,13 @@ class JolpicaAdapter:
         try:
             standings_list = data["MRData"]["StandingsTable"]["StandingsLists"]
             if standings_list:
-                return standings_list[0].get("DriverStandings", [])
+                return standings_list[0].get("DriverStandings", [])  # type: ignore[no-any-return]
         except (KeyError, TypeError, IndexError) as e:
             logger.debug(f"Driver standings parse error: {e}")
 
         return []
 
-    def get_race_results(self, season: int, round_num: int) -> list[dict]:
+    def get_race_results(self, season: int, round_num: int) -> list[dict[str, Any]]:
         """Get results for a specific race.
 
         Args:
@@ -182,7 +183,7 @@ class JolpicaAdapter:
         try:
             races = data["MRData"]["RaceTable"]["Races"]
             if races:
-                return races[0].get("Results", [])
+                return races[0].get("Results", [])  # type: ignore[no-any-return]
         except (KeyError, TypeError, IndexError) as e:
             logger.debug(f"Race results parse error: {e}")
 

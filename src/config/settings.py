@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,29 +26,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Google AI API
+    # Core settings
     google_api_key: str = ""
-
-    # Data directories
-    data_dir: Path = Path("./data")
-    cache_dir: Path = Path("./data/cache")
-
-    # Qdrant settings
     qdrant_url: str = ""
     qdrant_api_key: str = ""
 
-    @field_validator("google_api_key", "qdrant_api_key", "qdrant_url", mode="after")
-    @classmethod
-    def sanitize_secrets(cls, value: str) -> str:
-        """Remove BOM and whitespace from secret values."""
-        return _sanitize_secret(value)
-
-    # Model settings
-    llm_model: str = "gemini-2.0-flash"
+    # LLM settings
+    llm_model: str = "gemini-1.5-pro"
 
     # RAG settings
     chunk_size: int = 1000
-    chunk_overlap: int = 200
+    chunk_overlap: int = 400
     top_k_results: int = 5
 
     # Logging
@@ -64,6 +51,17 @@ class Settings(BaseSettings):
     def stewards_dir(self) -> Path:
         """Directory for stewards decision PDFs."""
         return self.data_dir / "stewards"
+
+    def get_config_hash(self) -> str:
+        """Generate a hash of the current ingestion configuration."""
+        import hashlib
+
+        config_str = f"{self.chunk_size}-{self.chunk_overlap}-{self.llm_model}"
+        return hashlib.md5(config_str.encode()).hexdigest()[:8]
+
+    # Data directories
+    data_dir: Path = Path("./data")
+    cache_dir: Path = Path("./data/cache")
 
     def ensure_directories(self) -> None:
         """Create all required directories if they don't exist."""

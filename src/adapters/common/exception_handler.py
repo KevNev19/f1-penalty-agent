@@ -48,7 +48,7 @@ def format_exception_json(
     tb = traceback.extract_tb(exc.__traceback__) if exc.__traceback__ else []
     last_frame = tb[-1] if tb else None
 
-    result: dict[str, Any] = {
+    error_response: dict[str, Any] = {
         "error": {
             "type": type(exc).__name__,
             "code": "PYTHON_ERR",
@@ -65,16 +65,16 @@ def format_exception_json(
     }
 
     if extra_context:
-        result["context"] = extra_context
+        error_response["context"] = extra_context
 
     if include_trace:
-        result["stack_trace"] = [
+        error_response["stack_trace"] = [
             line.strip()
             for line in traceback.format_exception(type(exc), exc, exc.__traceback__)
             if line.strip()
         ]
 
-    return result
+    return error_response
 
 
 def log_exception(

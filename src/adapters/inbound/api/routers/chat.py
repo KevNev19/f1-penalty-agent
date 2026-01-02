@@ -92,3 +92,55 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
             status_code=500,
             detail="An error occurred while processing your question. Please try again.",
         )
+
+
+@router.post("/ask/stream")
+def ask_question_stream(request: QuestionRequest):
+    """Stream the response token-by-token using Server-Sent Events.
+
+    Args:
+        request: The question request containing the user's question.
+
+    Returns:
+        StreamingResponse with SSE-formatted chunks.
+    """
+    import json
+
+    from fastapi.responses import StreamingResponse
+
+    def generate():
+        try:
+            agent = get_agent()
+            normalized_question = normalize_text(request.question)
+
+            # Validate minimum input length
+            if len(normalized_question.strip()) < 3:
+                yield f"data: {json.dumps({'type': 'chunk', 'content': 'I need a bit more context to help you.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'sources': []})}\n\n"
+                return
+
+            # Stream the response chunks
+            full_response = ""
+            for chunk in agent.ask_stream(normalized_question):
+                full_response += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            # Send done signal with sources (empty for now, could be enhanced)
+            yield f"data: {json.dumps({'type': 'done', 'sources': []})}\n\n"
+
+        except ValueError as e:
+            logger.warning(f"Invalid streaming request: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        except Exception as e:
+            logger.exception(f"Error in streaming response: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred. Please try again.'})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

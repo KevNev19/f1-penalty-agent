@@ -3,6 +3,7 @@
 import logging
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class SQLiteAdapter:
         except sqlite3.Error as e:
             logger.error(f"Failed to clear season {season}: {e}")
 
-    def execute_query(self, query: str, params: tuple = ()) -> list[tuple]:
+    def execute_query(self, query: str, params: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
         """Execute a READ-ONLY SQL query (for Agent use).
 
         Args:
