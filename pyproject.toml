@@ -38,6 +38,7 @@ dependencies = [
 
 [project.scripts]
 pitwall = "src.adapters.inbound.cli:app"
+setup-dev = "scripts.setup_dev:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -13,3 +13,18 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+
+  # Run tests before push (not on every commit - too slow)
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: poetry run pytest tests/ -m unit -q --tb=no
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
