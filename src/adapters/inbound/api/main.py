@@ -6,6 +6,9 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from ....core.domain.exceptions import F1AgentError
 from ...common.exception_handler import (
@@ -25,6 +28,11 @@ logger = logging.getLogger(__name__)
 # Determine if we're in debug mode (shows full stack traces)
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
 
+# Initialize rate limiter
+# Default: 60 requests per minute per IP for general endpoints
+# Chat endpoints have stricter limits defined in the router
+limiter = Limiter(key_func=get_remote_address)
+
 # Create FastAPI app
 app = FastAPI(
     title="PitWallAI API",
@@ -37,6 +45,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Add rate limiter to app state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Local dev
     "http://localhost:5173",  # Vite dev server
@@ -44,13 +56,20 @@ ALLOWED_ORIGINS = [
     "https://gen-lang-client-0855046443.firebaseapp.com",  # Firebase hosting alt
 ]
 
-# Configure CORS for frontend access
+# Configure CORS for frontend access with restricted methods and headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Restrict to only needed methods
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Origin",
+        "X-Requested-With",
+    ],  # Restrict to standard headers needed for API calls
 )
 
 

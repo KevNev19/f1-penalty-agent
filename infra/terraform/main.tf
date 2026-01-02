@@ -8,7 +8,7 @@ terraform {
     }
     qdrant-cloud = {
       source  = "qdrant/qdrant-cloud"
-      version = ">= 1.1.0"
+      version = "~> 1.14"  # Pin to 1.14.x to avoid breaking changes
     }
   }
 

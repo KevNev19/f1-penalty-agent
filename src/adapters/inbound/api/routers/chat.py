@@ -2,7 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from .....core.domain.agent import ChatMessage as DomainChatMessage
 from .....core.domain.utils import normalize_text
@@ -10,6 +12,10 @@ from ..deps import get_agent
 from ..models import AnswerResponse, ErrorResponse, QuestionRequest, SourceInfo
 
 logger = logging.getLogger(__name__)
+
+# Rate limiter for chat endpoints - more restrictive than general API
+# 20 requests per minute per IP to prevent abuse of LLM resources
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
@@ -19,14 +25,17 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
     response_model=AnswerResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Invalid request"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
-def ask_question(request: QuestionRequest) -> AnswerResponse:
+@limiter.limit("20/minute")
+def ask_question(request: Request, body: QuestionRequest) -> AnswerResponse:
     """Ask a question about F1 penalties or regulations.
 
     Args:
-        request: The question request containing the user's question.
+        request: The FastAPI request object (used for rate limiting).
+        body: The question request containing the user's question.
 
     Returns:
         AnswerResponse with the AI-generated answer and sources.
@@ -36,7 +45,7 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
     """
     try:
         agent = get_agent()
-        normalized_question = normalize_text(request.question)
+        normalized_question = normalize_text(body.question)
 
         # Validate minimum input length for meaningful processing
         if len(normalized_question.strip()) < 3:
@@ -48,7 +57,7 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
             )
 
         # Convert API messages to Domain messages
-        history = [DomainChatMessage(role=m.role, content=m.content) for m in request.messages]
+        history = [DomainChatMessage(role=m.role, content=m.content) for m in body.messages]
 
         # Get response from the agent
         response = agent.ask(normalized_question, messages=history)
@@ -95,11 +104,13 @@ def ask_question(request: QuestionRequest) -> AnswerResponse:
 
 
 @router.post("/ask/stream")
-def ask_question_stream(request: QuestionRequest):
+@limiter.limit("20/minute")
+def ask_question_stream(request: Request, body: QuestionRequest):
     """Stream the response token-by-token using Server-Sent Events.
 
     Args:
-        request: The question request containing the user's question.
+        request: The FastAPI request object (used for rate limiting).
+        body: The question request containing the user's question.
 
     Returns:
         StreamingResponse with SSE-formatted chunks.
@@ -111,7 +122,7 @@ def ask_question_stream(request: QuestionRequest):
     def generate():
         try:
             agent = get_agent()
-            normalized_question = normalize_text(request.question)
+            normalized_question = normalize_text(body.question)
 
             # Validate minimum input length
             if len(normalized_question.strip()) < 3:
