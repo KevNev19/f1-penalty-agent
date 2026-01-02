@@ -188,14 +188,37 @@ class SQLiteAdapter:
                 return False, "Query contains blocked pattern for security reasons."
 
         # Extract table references and validate against whitelist
-        # Simple pattern to find FROM and JOIN table references
-        table_pattern = r"\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)"
-        referenced_tables = re.findall(table_pattern, query_upper, re.IGNORECASE)
+        # Pattern matches: FROM/JOIN followed by table name (quoted or unquoted)
+        # Handles: table_name, "table_name", 'table_name', [table_name], `table_name`
+        table_pattern = (
+            r"\b(?:FROM|JOIN)\s+"
+            r"(?:"
+            r'"([^"]+)"|'  # Double-quoted: "table_name"
+            r"'([^']+)'|"  # Single-quoted: 'table_name'
+            r"\[([^\]]+)\]|"  # Square brackets: [table_name]
+            r"`([^`]+)`|"  # Backticks: `table_name`
+            r"([a-zA-Z_][a-zA-Z0-9_]*)"  # Unquoted identifier
+            r")"
+        )
+        matches = re.findall(table_pattern, query, re.IGNORECASE)
+
+        # Each match is a tuple of groups; extract the non-empty one
+        referenced_tables = []
+        for match in matches:
+            # match is a tuple like ('', '', '', '', 'penalties') or ('sqlite_master', '', '', '', '')
+            table_name = next((g for g in match if g), None)
+            if table_name:
+                referenced_tables.append(table_name)
 
         for table in referenced_tables:
             if table.lower() not in ALLOWED_TABLES:
                 logger.warning(f"Query references non-whitelisted table: {table}")
                 return False, f"Query references non-allowed table: {table}"
+
+        # Additional check: require at least one table reference for valid queries
+        if not referenced_tables:
+            logger.warning("Query has no identifiable table references")
+            return False, "Query must reference an allowed table."
 
         return True, ""
 

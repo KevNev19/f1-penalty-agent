@@ -163,3 +163,46 @@ class TestSQLSecurityValidation:
 
         results = adapter.execute_query("SELECT COUNT(*), team FROM penalties GROUP BY team")
         assert len(results) >= 1
+
+    def test_blocks_double_quoted_table_bypass(self, tmp_path):
+        """Test that double-quoted non-whitelisted tables are blocked."""
+        db_file = tmp_path / "test_security.db"
+        adapter = SQLiteAdapter(db_file)
+
+        with pytest.raises(ValueError, match="non-allowed table"):
+            adapter.execute_query('SELECT * FROM "sqlite_master"')
+
+    def test_blocks_single_quoted_table_bypass(self, tmp_path):
+        """Test that single-quoted non-whitelisted tables are blocked."""
+        db_file = tmp_path / "test_security.db"
+        adapter = SQLiteAdapter(db_file)
+
+        with pytest.raises(ValueError, match="non-allowed table"):
+            adapter.execute_query("SELECT * FROM 'sqlite_master'")
+
+    def test_blocks_bracket_quoted_table_bypass(self, tmp_path):
+        """Test that bracket-quoted non-whitelisted tables are blocked."""
+        db_file = tmp_path / "test_security.db"
+        adapter = SQLiteAdapter(db_file)
+
+        with pytest.raises(ValueError, match="non-allowed table"):
+            adapter.execute_query("SELECT * FROM [sqlite_master]")
+
+    def test_blocks_backtick_quoted_table_bypass(self, tmp_path):
+        """Test that backtick-quoted non-whitelisted tables are blocked."""
+        db_file = tmp_path / "test_security.db"
+        adapter = SQLiteAdapter(db_file)
+
+        with pytest.raises(ValueError, match="non-allowed table"):
+            adapter.execute_query("SELECT * FROM `sqlite_master`")
+
+    def test_allows_quoted_whitelisted_table(self, tmp_path):
+        """Test that quoted whitelisted tables are allowed."""
+        db_file = tmp_path / "test_security.db"
+        adapter = SQLiteAdapter(db_file)
+
+        adapter.insert_penalty(2025, "Monaco GP", "Max Verstappen", "Time", "5s penalty")
+
+        # Double-quoted whitelisted table should work
+        results = adapter.execute_query('SELECT count(*) FROM "penalties"')
+        assert results[0][0] == 1
