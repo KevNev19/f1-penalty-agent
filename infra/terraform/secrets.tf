@@ -100,6 +100,17 @@ resource "google_secret_manager_secret_iam_member" "github_firebase_sa_access" {
 }
 
 # GitHub secret for Qdrant Cloud API key (for CI/CD Terraform runs)
+# Import existing secrets that were created before Terraform managed them
+import {
+  to = google_secret_manager_secret.github_qdrant_cloud_api_key
+  id = "projects/644343732628/secrets/github-qdrant-cloud-api-key"
+}
+
+import {
+  to = google_secret_manager_secret.github_qdrant_account_id
+  id = "projects/644343732628/secrets/github-qdrant-account-id"
+}
+
 resource "google_secret_manager_secret" "github_qdrant_cloud_api_key" {
   secret_id = "github-qdrant-cloud-api-key"
 

@@ -6,6 +6,9 @@ import pytest
 
 from src.adapters.outbound.sqlite_adapter import SQLiteAdapter
 
+# Apply @pytest.mark.unit to all tests in this module
+pytestmark = pytest.mark.unit
+
 
 def test_init_db(tmp_path):
     """Test database initialization and schema creation."""

@@ -5,6 +5,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+# Import modules before patching to ensure they're loaded
+from src.adapters.inbound.api.routers import chat, health  # noqa: F401
+
 
 @pytest.fixture
 def mock_agent():

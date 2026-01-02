@@ -1,6 +1,9 @@
+import pytest
+
 from src.core.domain.utils import normalize_text
 
 
+@pytest.mark.unit
 def test_normalize_text_removes_bom_and_collapses_whitespace():
     text = "\ufeffRésumé   café\r\n\r\n\r\na"  # Contains BOM, double spaces, mixed newlines
 

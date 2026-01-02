@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, Mock
 
+import pytest
+
 from src.core.domain.agent import QueryType
 from src.core.ports.analytics_port import AnalyticsPort
 from src.core.ports.llm_port import LLMPort
@@ -9,6 +11,7 @@ from src.core.services.agent_service import AgentService
 from src.core.services.retrieval_service import RetrievalService
 
 
+@pytest.mark.unit
 def test_classify_analytics_query():
     """Test classification of analytics queries."""
     llm = Mock(spec=LLMPort)
@@ -36,6 +39,7 @@ def test_classify_analytics_query():
         assert agent.classify_query(query) != QueryType.ANALYTICS
 
 
+@pytest.mark.unit
 def test_ask_analytics_flow():
     """Test the ask flow for analytics queries."""
     llm = Mock(spec=LLMPort)
@@ -71,6 +75,7 @@ def test_ask_analytics_flow():
     assert response.answer == "McLaren received 5 penalties."
 
 
+@pytest.mark.unit
 def test_analytics_fail_safe():
     """Test that analytics failure handles gracefully."""
     llm = Mock(spec=LLMPort)

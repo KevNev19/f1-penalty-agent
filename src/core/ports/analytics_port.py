@@ -21,3 +21,15 @@ class AnalyticsPort(Protocol):
     def get_metrics(self, metric_name: str, period: tuple[Any, Any] | None = None) -> Any:
         """Get metrics for a specific period."""
         pass
+
+    @abstractmethod
+    def execute_query(self, sql: str) -> list[tuple[Any, ...]]:
+        """Execute a SQL query and return results.
+
+        Args:
+            sql: SQL query string to execute.
+
+        Returns:
+            List of tuples containing query results.
+        """
+        pass

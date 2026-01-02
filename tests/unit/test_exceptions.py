@@ -28,6 +28,9 @@ from src.core.domain.exceptions import (
     VectorStoreError,
 )
 
+# Apply @pytest.mark.unit to all tests in this module
+pytestmark = pytest.mark.unit
+
 
 class TestExceptionHierarchy:
     """Tests for the exception class hierarchy."""
