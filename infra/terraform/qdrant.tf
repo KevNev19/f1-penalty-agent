@@ -35,12 +35,6 @@ resource "qdrant-cloud_accounts_cluster" "f1_agent" {
       }
     }
 
-    # Explicitly set defaults to avoid drift
-    gpu_type           = "CLUSTER_CONFIGURATION_GPU_TYPE_UNSPECIFIED"
-    rebalance_strategy = "CLUSTER_CONFIGURATION_REBALANCE_STRATEGY_BY_COUNT_AND_SIZE"
-    restart_policy     = "CLUSTER_CONFIGURATION_RESTART_POLICY_UNSPECIFIED"
-    service_type       = "CLUSTER_SERVICE_TYPE_CLUSTER_IP"
-
     node_configuration {
       package_id = local.free_tier_package[0].id
     }
