@@ -362,7 +362,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      actions: write # Required to update repository variables
+
     outputs:
       api_url: ${{ steps.get-url.outputs.api_url }}
 
@@ -420,10 +420,6 @@ jobs:
           SERVICE_URL=$(gcloud run services describe ${{ vars.SERVICE_NAME }} --region=${{ vars.REGION }} --format='value(status.url)')
           echo "Service URL: $SERVICE_URL"
           echo "api_url=$SERVICE_URL" >> $GITHUB_OUTPUT
-
-          # Update GitHub Variable for visibility/manual checks
-          echo "Updating VITE_API_BASE_URL variable..."
-          gh variable set VITE_API_BASE_URL --body "$SERVICE_URL" || echo "Warning: Failed to update GitHub variable (permission issue?)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -433,7 +429,7 @@ jobs:
 
           for i in 1 2 3; do
             echo "Health check attempt $i..."
-            if curl -sf "$SERVICE_URL/health" > /dev/null; then
+            if curl -sf "$SERVICE_URL/api/v1/health" > /dev/null; then
               echo "Health check passed!"
               exit 0
             fi
