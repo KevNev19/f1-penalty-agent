@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str = ""
 
     # LLM settings
-    llm_model: str = "gemini-1.5-pro"
+    llm_model: str = "gemini-2.0-flash"
 
     # RAG settings
     chunk_size: int = 1000
