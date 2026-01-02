@@ -22,7 +22,7 @@ dependencies = [
 
     # LLM
     "google-genai>=1.56.0",  # Updated from 1.0.0
-    "torch==2.2.2",  # Pin to known working version for Intel Mac
+    "torch>=2.6.0",  # Minimum 2.6.0 required to fix CVE-2025-32434 (RCE via torch.load)
 
     # Utilities
     "python-dotenv>=1.0.0",
