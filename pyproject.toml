@@ -22,7 +22,7 @@ dependencies = [
 
     # LLM
     "google-genai>=1.56.0",  # Updated from 1.0.0
-    "torch==2.2.2",  # Pin to known working version for Intel Mac
+    "torch==2.8.0",  # Pin to known working version for Intel Mac
 
     # Utilities
     "python-dotenv>=1.0.0",
